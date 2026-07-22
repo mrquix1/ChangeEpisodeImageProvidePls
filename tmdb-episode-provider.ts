@@ -12,46 +12,27 @@ let episodeImageCache = {}
 function init() {
     console.log("[TMDb] Extension initialized")
     
-    $app.onGetAnime((e) => {
-        console.log("[TMDb] onGetAnime hook triggered for anime:", e.anime?.id)
-        
-        if (e.anime) {
-            const animeId = e.anime.id
-            const tvdbId = e.anime.idMal  // Try MAL ID as fallback
-            console.log("[TMDb] Anime ID:", animeId, "MAL ID:", tvdbId)
-            
-            // Try to get episodes - check if it's in a different property
-            let episodes = null
-            if (Array.isArray(e.anime.episodes)) {
-                episodes = e.anime.episodes
-            } else if (typeof e.anime.episodes === 'object' && e.anime.episodes) {
-                // It might be an object with episode data
-                console.log("[TMDb] Episodes object:", Object.keys(e.anime.episodes))
-            }
-            
-            // Check if there's a different way to access episodes
-            console.log("[TMDb] Checking anime object for episode data...")
-            console.log("[TMDb] e.anime.toCompleteAnime:", typeof e.anime.toCompleteAnime)
-            
-            if (typeof e.anime.toCompleteAnime === 'function') {
-                const complete = e.anime.toCompleteAnime()
-                console.log("[TMDb] Complete anime keys:", Object.keys(complete || {}))
-                if (complete && complete.episodes) {
-                    console.log("[TMDb] Found episodes in complete anime:", complete.episodes.length)
-                    episodes = complete.episodes
-                }
-            }
-            
-            if (episodes && Array.isArray(episodes)) {
-                console.log("[TMDb] Processing", episodes.length, "episodes")
-                episodes.forEach((ep, idx) => {
-                    if (idx < 3) {
-                        console.log(`[TMDb] Episode ${idx}:`, Object.keys(ep))
-                    }
-                })
-            }
-        }
-        
+    // Try multiple hooks to see which one fires and when
+    $app.onScanCompleted((e) => {
+        console.log("[TMDb] onScanCompleted fired")
+        e.next()
+    })
+    
+    $app.onAnimeEntryLibraryDataRequested((e) => {
+        console.log("[TMDb] onAnimeEntryLibraryDataRequested fired")
+        console.log("[TMDb] Entry:", e.entry?.media?.id)
+        console.log("[TMDb] Files:", e.entryLocalFiles?.length || 0)
+        e.next()
+    })
+    
+    $app.onAnimeEntriesLibraryDataRequested((e) => {
+        console.log("[TMDb] onAnimeEntriesLibraryDataRequested fired with", e.entries?.length, "entries")
+        e.next()
+    })
+    
+    $app.onGetAnimeEntry((e) => {
+        console.log("[TMDb] onGetAnimeEntry fired")
+        console.log("[TMDb] Entry media ID:", e.entry?.media?.id)
         e.next()
     })
 
