@@ -12,48 +12,53 @@ let episodeImageCache = {}
 function init() {
     console.log("[TMDb] Extension initialized")
     
+    $app.onAnimeEntryLibraryDataRequested((e) => {
+        console.log("[TMDb] onAnimeEntryLibraryDataRequested triggered")
+        console.log("[TMDb] Entry ID:", e.entry?.media?.id)
+        console.log("[TMDb] Local files count:", e.entryLocalFiles?.length || 0)
+        
+        if (e.entry && e.entry.media && e.entryLocalFiles) {
+            const tvdbId = e.entry.media.id
+            console.log(`[TMDb] Processing TVDB ID: ${tvdbId}`)
+            
+            // Try to get and cache episode images
+            e.entryLocalFiles.forEach((file, idx) => {
+                console.log(`[TMDb] File ${idx}: ${file}`)
+                
+                // Extract season and episode from filename
+                const seasonMatch = file.match(/[Ss](\d+)/)?.[1]
+                const episodeMatch = file.match(/[Ee](?:pisode)?[\s_-]?(\d+)/)?.[1]
+                
+                if (seasonMatch && episodeMatch) {
+                    const season = parseInt(seasonMatch)
+                    const episode = parseInt(episodeMatch)
+                    console.log(`[TMDb] Extracted S${season}E${episode}`)
+                    
+                    const tmdbImage = getTmdbEpisodeImage(tvdbId, season, episode)
+                    if (tmdbImage) {
+                        console.log(`[TMDb] Got image: ${tmdbImage}`)
+                    }
+                }
+            })
+        }
+        
+        e.next()
+    })
+
     $ui.register((ctx) => {
         console.log("[TMDb] UI context registered")
-        
-        ctx.dom.onReady(() => {
-            console.log("[TMDb] DOM ready, setting up episode image observer")
-            
-            // Watch for episode images in the DOM
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    // Look for img tags with thetvdb URLs
-                    const images = document.querySelectorAll('img[src*="thetvdb.com"]')
-                    console.log(`[TMDb] Found ${images.length} TheTVDB images`)
-                    
-                    images.forEach((img) => {
-                        if (!img.dataset.tmdbProcessed) {
-                            img.dataset.tmdbProcessed = "true"
-                            console.log(`[TMDb] Processing image: ${img.src.substring(0, 60)}...`)
-                            // Just log for now to see if we're catching images
-                        }
-                    })
-                })
-            })
-            
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['src']
-            })
-        })
     })
 }
 
-function getTmdbEpisodeImage(tvdbId, episodeNumber) {
-    const cacheKey = `${tvdbId}_${episodeNumber}`
+function getTmdbEpisodeImage(tvdbId, season, episodeNumber) {
+    const cacheKey = `${tvdbId}_${season}_${episodeNumber}`
     if (episodeImageCache[cacheKey]) {
         console.log(`[TMDb] Cache hit for ${cacheKey}`)
         return episodeImageCache[cacheKey]
     }
 
     try {
-        console.log(`[TMDb] Looking up TVDB ID ${tvdbId} for episode ${episodeNumber}`)
+        console.log(`[TMDb] Looking up TVDB ID ${tvdbId} for S${season}E${episodeNumber}`)
         const searchUrl = `${TMDB_BASE_URL}/find/${tvdbId}?api_key=${TMDB_API_KEY}&external_source=tvdb_id`
         const response = $http.get(searchUrl)
         
@@ -65,20 +70,20 @@ function getTmdbEpisodeImage(tvdbId, episodeNumber) {
         const tmdbShowId = response.tv_results[0].id
         console.log(`[TMDb] Found TMDb show ID: ${tmdbShowId}`)
         
-        const episodeUrl = `${TMDB_BASE_URL}/tv/${tmdbShowId}/season/1/episode/${episodeNumber}?api_key=${TMDB_API_KEY}`
+        const episodeUrl = `${TMDB_BASE_URL}/tv/${tmdbShowId}/season/${season}/episode/${episodeNumber}?api_key=${TMDB_API_KEY}`
         const episodeResponse = $http.get(episodeUrl)
 
         if (episodeResponse && episodeResponse.still_path) {
             const imageUrl = TMDB_IMAGE_BASE_URL + episodeResponse.still_path
-            console.log(`[TMDb] Found image for episode ${episodeNumber}: ${imageUrl}`)
+            console.log(`[TMDb] Found image for S${season}E${episodeNumber}: ${imageUrl}`)
             episodeImageCache[cacheKey] = imageUrl
             return imageUrl
         }
 
-        console.log(`[TMDb] No image found for episode ${episodeNumber}`)
+        console.log(`[TMDb] No image found for S${season}E${episodeNumber}`)
         return null
     } catch (error) {
-        console.error(`[TMDb] Error fetching image for episode ${episodeNumber}:`, error)
+        console.error(`[TMDb] Error fetching image for S${season}E${episodeNumber}:`, error)
         return null
     }
 }
