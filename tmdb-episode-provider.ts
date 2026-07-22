@@ -12,33 +12,36 @@ let episodeImageCache = {}
 function init() {
     console.log("[TMDb] Extension initialized")
     
-    $app.onGetAnime((e) => {
-        console.log("[TMDb] onGetAnime hook triggered for anime:", e.anime?.id)
-        
-        if (e.anime && e.anime.episodes) {
-            console.log(`[TMDb] Found ${e.anime.episodes.length} episodes`)
-            
-            e.anime.episodes.forEach((episode) => {
-                if (episode.image) {
-                    console.log(`[TMDb] Episode ${episode.episodeNumber} - current image: ${episode.image.substring(0, 50)}...`)
-                    const tmdbImage = getTmdbEpisodeImage(e.anime.id, episode.episodeNumber)
-                    if (tmdbImage) {
-                        console.log(`[TMDb] Replacing with: ${tmdbImage.substring(0, 50)}...`)
-                        episode.image = tmdbImage
-                    } else {
-                        console.log(`[TMDb] No TMDb image found for episode ${episode.episodeNumber}`)
-                    }
-                }
-            })
-        } else {
-            console.log("[TMDb] No anime or episodes found")
-        }
-        
-        e.next()
-    })
-
     $ui.register((ctx) => {
         console.log("[TMDb] UI context registered")
+        
+        ctx.dom.onReady(() => {
+            console.log("[TMDb] DOM ready, setting up episode image observer")
+            
+            // Watch for episode images in the DOM
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    // Look for img tags with thetvdb URLs
+                    const images = document.querySelectorAll('img[src*="thetvdb.com"]')
+                    console.log(`[TMDb] Found ${images.length} TheTVDB images`)
+                    
+                    images.forEach((img) => {
+                        if (!img.dataset.tmdbProcessed) {
+                            img.dataset.tmdbProcessed = "true"
+                            console.log(`[TMDb] Processing image: ${img.src.substring(0, 60)}...`)
+                            // Just log for now to see if we're catching images
+                        }
+                    })
+                })
+            })
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['src']
+            })
+        })
     })
 }
 
