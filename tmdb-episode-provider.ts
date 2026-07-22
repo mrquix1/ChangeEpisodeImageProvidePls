@@ -39,30 +39,37 @@ function init() {
 function getTmdbEpisodeImage(tvdbId, episodeNumber) {
     const cacheKey = `${tvdbId}_${episodeNumber}`
     if (episodeImageCache[cacheKey]) {
+        console.log(`[TMDb] Cache hit for ${cacheKey}`)
         return episodeImageCache[cacheKey]
     }
 
     try {
+        console.log(`[TMDb] Looking up TVDB ID ${tvdbId} for episode ${episodeNumber}`)
         const searchUrl = `${TMDB_BASE_URL}/find/${tvdbId}?api_key=${TMDB_API_KEY}&external_source=tvdb_id`
         const response = $http.get(searchUrl)
         
         if (!response || !response.tv_results || response.tv_results.length === 0) {
+            console.log(`[TMDb] No results found for TVDB ID ${tvdbId}`)
             return null
         }
 
         const tmdbShowId = response.tv_results[0].id
+        console.log(`[TMDb] Found TMDb show ID: ${tmdbShowId}`)
+        
         const episodeUrl = `${TMDB_BASE_URL}/tv/${tmdbShowId}/season/1/episode/${episodeNumber}?api_key=${TMDB_API_KEY}`
         const episodeResponse = $http.get(episodeUrl)
 
         if (episodeResponse && episodeResponse.still_path) {
             const imageUrl = TMDB_IMAGE_BASE_URL + episodeResponse.still_path
+            console.log(`[TMDb] Found image for episode ${episodeNumber}: ${imageUrl}`)
             episodeImageCache[cacheKey] = imageUrl
             return imageUrl
         }
 
+        console.log(`[TMDb] No image found for episode ${episodeNumber}`)
         return null
     } catch (error) {
-        console.error(`Error fetching TMDb image for episode ${episodeNumber}:`, error)
+        console.error(`[TMDb] Error fetching image for episode ${episodeNumber}:`, error)
         return null
     }
 }
