@@ -10,28 +10,31 @@ const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 let episodeImageCache = {}
 
 function init() {
-    $app.onAnimeEntryLibraryDataRequested((e) => {
-        if (e.entry && e.entry.media) {
-            const tvdbId = e.entry.media.id
+    console.log("[TMDb] Extension initialized")
+    
+    $app.onGetAnime((e) => {
+        console.log("[TMDb] onGetAnime hook triggered for anime:", e.anime?.id)
+        
+        if (e.anime && e.anime.episodes && e.anime.episodes.length > 0) {
+            console.log(`[TMDb] Processing ${e.anime.episodes.length} episodes`)
             
-            if (e.entryLocalFiles && e.entryLocalFiles.length > 0) {
-                e.entryLocalFiles.forEach((file) => {
-                    const epMatch = file.match(/[Ee]p(?:isode)?[\s_-]?(\d+)/)
-                    if (epMatch) {
-                        const epNum = parseInt(epMatch[1])
-                        const tmdbImage = getTmdbEpisodeImage(tvdbId, epNum)
-                        if (tmdbImage) {
-                            $storage.set(`tmdb-image_${tvdbId}_${epNum}`, tmdbImage)
-                        }
+            e.anime.episodes.forEach((episode, idx) => {
+                if (episode.image) {
+                    console.log(`[TMDb] Episode ${episode.episodeNumber} current image: ${episode.image}`)
+                    const tmdbImage = getTmdbEpisodeImage(e.anime.id, episode.episodeNumber)
+                    if (tmdbImage) {
+                        console.log(`[TMDb] Replacing with TMDb image: ${tmdbImage}`)
+                        episode.image = tmdbImage
                     }
-                })
-            }
+                }
+            })
         }
         
         e.next()
     })
 
     $ui.register((ctx) => {
+        console.log("[TMDb] UI context registered")
         ctx.toast.info("TMDb Episode Provider activated")
     })
 }
