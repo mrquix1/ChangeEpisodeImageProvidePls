@@ -10,16 +10,22 @@ const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 let episodeImageCache = {}
 
 function init() {
-    $app.onAnimeDetailsRequested((e) => {
-        if (e.anime && e.anime.episodes) {
-            e.anime.episodes.forEach((episode) => {
-                if (episode.image && episode.image.includes("thetvdb.com")) {
-                    const tmdbImage = getTmdbEpisodeImage(e.anime.id, episode.episodeNumber)
-                    if (tmdbImage) {
-                        episode.image = tmdbImage
+    $app.onAnimeEntryLibraryDataRequested((e) => {
+        if (e.entry && e.entry.media) {
+            const tvdbId = e.entry.media.id
+            
+            if (e.entryLocalFiles && e.entryLocalFiles.length > 0) {
+                e.entryLocalFiles.forEach((file) => {
+                    const epMatch = file.match(/[Ee]p(?:isode)?[\s_-]?(\d+)/)
+                    if (epMatch) {
+                        const epNum = parseInt(epMatch[1])
+                        const tmdbImage = getTmdbEpisodeImage(tvdbId, epNum)
+                        if (tmdbImage) {
+                            $storage.set(`tmdb-image_${tvdbId}_${epNum}`, tmdbImage)
+                        }
                     }
-                }
-            })
+                })
+            }
         }
         
         e.next()
