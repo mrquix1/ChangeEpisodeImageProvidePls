@@ -12,44 +12,42 @@ let episodeImageCache = {}
 function init() {
     console.log("[TMDb] Extension initialized")
     
+    $app.onGetAnimeCollection((e) => {
+        console.log("[TMDb] onGetAnimeCollection triggered")
+        
+        if (!e.animeCollection?.mediaListCollection?.lists?.length) {
+            console.log("[TMDb] No anime collection found")
+            e.next()
+            return
+        }
+        
+        console.log("[TMDb] Processing anime collection")
+        
+        // Go through all anime in the collection
+        for (let i = 0; i < e.animeCollection.mediaListCollection.lists.length; i++) {
+            const list = e.animeCollection.mediaListCollection.lists[i]
+            if (!list?.entries) continue
+            
+            for (let j = 0; j < list.entries.length; j++) {
+                const entry = list.entries[j]
+                if (!entry?.media?.id) continue
+                
+                const mediaId = entry.media.id
+                console.log(`[TMDb] Processing anime ID: ${mediaId}`)
+                
+                // Replace banner image if it's from TheTVDB
+                if (entry.media.bannerImage && entry.media.bannerImage.includes("thetvdb")) {
+                    console.log(`[TMDb] Found TheTVDB banner for media ${mediaId}`)
+                }
+            }
+        }
+        
+        e.next()
+    })
+
     $ui.register((ctx) => {
         console.log("[TMDb] UI context registered")
-        
-        // Wait for DOM to be ready
-        setTimeout(() => {
-            console.log("[TMDb] Starting episode image replacement")
-            replaceEpisodeImages()
-            
-            // Also check periodically in case new episodes are loaded
-            setInterval(() => {
-                replaceEpisodeImages()
-            }, 2000)
-        }, 1000)
     })
-}
-
-function replaceEpisodeImages() {
-    try {
-        // Find all images with thetvdb in src
-        const images = document.querySelectorAll('img[src*="thetvdb"]')
-        console.log("[TMDb] Found", images.length, "TheTVDB images")
-        
-        images.forEach((img) => {
-            if (!img.dataset.tmdbProcessed) {
-                img.dataset.tmdbProcessed = "true"
-                console.log("[TMDb] Processing image:", img.src.substring(0, 60))
-                
-                // Extract episode number from nearby text or alt text
-                const alt = img.getAttribute('alt') || ''
-                const parent = img.closest('[data-episode]') || img.closest('article') || img.parentElement
-                const text = parent?.textContent || alt
-                
-                console.log("[TMDb] Context text:", text.substring(0, 50))
-            }
-        })
-    } catch (error) {
-        console.error("[TMDb] Error in replaceEpisodeImages:", error)
-    }
 }
 
 function getTmdbEpisodeImage(tvdbId, season, episodeNumber) {
