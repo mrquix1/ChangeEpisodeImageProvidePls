@@ -14,16 +14,23 @@ function init() {
     
     $app.onGetAnime((e) => {
         console.log("[TMDb] onGetAnime hook triggered")
-        console.log("[TMDb] Anime object keys:", Object.keys(e.anime || {}))
         
         if (e.anime) {
             console.log("[TMDb] Anime ID:", e.anime.id)
-            console.log("[TMDb] Has episodes:", !!e.anime.episodes)
             
-            // Log what we actually have
-            if (e.anime.episodes) {
-                console.log("[TMDb] Episodes count:", e.anime.episodes.length)
-                console.log("[TMDb] First episode keys:", Object.keys(e.anime.episodes[0] || {}))
+            // Call getEpisodes() method
+            const episodes = e.anime.getEpisodes()
+            console.log("[TMDb] Episodes from getEpisodes():", episodes)
+            console.log("[TMDb] Episodes count:", episodes?.length || 0)
+            
+            if (episodes && episodes.length > 0) {
+                console.log("[TMDb] First episode:", episodes[0])
+                
+                episodes.forEach((ep, idx) => {
+                    if (idx < 3) {  // Log first 3
+                        console.log(`[TMDb] Episode ${idx}:`, Object.keys(ep))
+                    }
+                })
             }
         }
         
