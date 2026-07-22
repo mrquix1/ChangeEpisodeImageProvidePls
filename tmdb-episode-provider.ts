@@ -13,21 +13,39 @@ function init() {
     console.log("[TMDb] Extension initialized")
     
     $app.onGetAnime((e) => {
-        console.log("[TMDb] onGetAnime hook triggered")
+        console.log("[TMDb] onGetAnime hook triggered for anime:", e.anime?.id)
         
         if (e.anime) {
-            console.log("[TMDb] Anime ID:", e.anime.id)
+            const animeId = e.anime.id
+            const tvdbId = e.anime.idMal  // Try MAL ID as fallback
+            console.log("[TMDb] Anime ID:", animeId, "MAL ID:", tvdbId)
             
-            // Call getEpisodes() method
-            const episodes = e.anime.getEpisodes()
-            console.log("[TMDb] Episodes from getEpisodes():", episodes)
-            console.log("[TMDb] Episodes count:", episodes?.length || 0)
+            // Try to get episodes - check if it's in a different property
+            let episodes = null
+            if (Array.isArray(e.anime.episodes)) {
+                episodes = e.anime.episodes
+            } else if (typeof e.anime.episodes === 'object' && e.anime.episodes) {
+                // It might be an object with episode data
+                console.log("[TMDb] Episodes object:", Object.keys(e.anime.episodes))
+            }
             
-            if (episodes && episodes.length > 0) {
-                console.log("[TMDb] First episode:", episodes[0])
-                
+            // Check if there's a different way to access episodes
+            console.log("[TMDb] Checking anime object for episode data...")
+            console.log("[TMDb] e.anime.toCompleteAnime:", typeof e.anime.toCompleteAnime)
+            
+            if (typeof e.anime.toCompleteAnime === 'function') {
+                const complete = e.anime.toCompleteAnime()
+                console.log("[TMDb] Complete anime keys:", Object.keys(complete || {}))
+                if (complete && complete.episodes) {
+                    console.log("[TMDb] Found episodes in complete anime:", complete.episodes.length)
+                    episodes = complete.episodes
+                }
+            }
+            
+            if (episodes && Array.isArray(episodes)) {
+                console.log("[TMDb] Processing", episodes.length, "episodes")
                 episodes.forEach((ep, idx) => {
-                    if (idx < 3) {  // Log first 3
+                    if (idx < 3) {
                         console.log(`[TMDb] Episode ${idx}:`, Object.keys(ep))
                     }
                 })
