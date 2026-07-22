@@ -12,7 +12,6 @@ let episodeImageCache = {}
 function init() {
     console.log("[TMDb] Extension initialized")
     
-    // Try multiple hooks to see which one fires and when
     $app.onScanCompleted((e) => {
         console.log("[TMDb] onScanCompleted fired")
         e.next()
@@ -20,19 +19,17 @@ function init() {
     
     $app.onAnimeEntryLibraryDataRequested((e) => {
         console.log("[TMDb] onAnimeEntryLibraryDataRequested fired")
-        console.log("[TMDb] Entry:", e.entry?.media?.id)
+        console.log("[TMDb] Entry ID:", e.entry?.media?.id)
         console.log("[TMDb] Files:", e.entryLocalFiles?.length || 0)
-        e.next()
-    })
-    
-    $app.onAnimeEntriesLibraryDataRequested((e) => {
-        console.log("[TMDb] onAnimeEntriesLibraryDataRequested fired with", e.entries?.length, "entries")
         e.next()
     })
     
     $app.onGetAnimeEntry((e) => {
         console.log("[TMDb] onGetAnimeEntry fired")
-        console.log("[TMDb] Entry media ID:", e.entry?.media?.id)
+        console.log("[TMDb] Entry keys:", Object.keys(e.entry || {}))
+        if (e.entry && e.entry.media) {
+            console.log("[TMDb] Media ID:", e.entry.media.id)
+        }
         e.next()
     })
 
