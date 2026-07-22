@@ -12,34 +12,19 @@ let episodeImageCache = {}
 function init() {
     console.log("[TMDb] Extension initialized")
     
-    $app.onAnimeEntryLibraryDataRequested((e) => {
-        console.log("[TMDb] onAnimeEntryLibraryDataRequested triggered")
-        console.log("[TMDb] Entry ID:", e.entry?.media?.id)
-        console.log("[TMDb] Local files count:", e.entryLocalFiles?.length || 0)
+    $app.onGetAnime((e) => {
+        console.log("[TMDb] onGetAnime hook triggered")
+        console.log("[TMDb] Anime object keys:", Object.keys(e.anime || {}))
         
-        if (e.entry && e.entry.media && e.entryLocalFiles) {
-            const tvdbId = e.entry.media.id
-            console.log(`[TMDb] Processing TVDB ID: ${tvdbId}`)
+        if (e.anime) {
+            console.log("[TMDb] Anime ID:", e.anime.id)
+            console.log("[TMDb] Has episodes:", !!e.anime.episodes)
             
-            // Try to get and cache episode images
-            e.entryLocalFiles.forEach((file, idx) => {
-                console.log(`[TMDb] File ${idx}: ${file}`)
-                
-                // Extract season and episode from filename
-                const seasonMatch = file.match(/[Ss](\d+)/)?.[1]
-                const episodeMatch = file.match(/[Ee](?:pisode)?[\s_-]?(\d+)/)?.[1]
-                
-                if (seasonMatch && episodeMatch) {
-                    const season = parseInt(seasonMatch)
-                    const episode = parseInt(episodeMatch)
-                    console.log(`[TMDb] Extracted S${season}E${episode}`)
-                    
-                    const tmdbImage = getTmdbEpisodeImage(tvdbId, season, episode)
-                    if (tmdbImage) {
-                        console.log(`[TMDb] Got image: ${tmdbImage}`)
-                    }
-                }
-            })
+            // Log what we actually have
+            if (e.anime.episodes) {
+                console.log("[TMDb] Episodes count:", e.anime.episodes.length)
+                console.log("[TMDb] First episode keys:", Object.keys(e.anime.episodes[0] || {}))
+            }
         }
         
         e.next()
