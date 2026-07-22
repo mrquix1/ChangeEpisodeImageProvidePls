@@ -15,19 +15,23 @@ function init() {
     $app.onGetAnime((e) => {
         console.log("[TMDb] onGetAnime hook triggered for anime:", e.anime?.id)
         
-        if (e.anime && e.anime.episodes && e.anime.episodes.length > 0) {
-            console.log(`[TMDb] Processing ${e.anime.episodes.length} episodes`)
+        if (e.anime && e.anime.episodes) {
+            console.log(`[TMDb] Found ${e.anime.episodes.length} episodes`)
             
-            e.anime.episodes.forEach((episode, idx) => {
+            e.anime.episodes.forEach((episode) => {
                 if (episode.image) {
-                    console.log(`[TMDb] Episode ${episode.episodeNumber} current image: ${episode.image}`)
+                    console.log(`[TMDb] Episode ${episode.episodeNumber} - current image: ${episode.image.substring(0, 50)}...`)
                     const tmdbImage = getTmdbEpisodeImage(e.anime.id, episode.episodeNumber)
                     if (tmdbImage) {
-                        console.log(`[TMDb] Replacing with TMDb image: ${tmdbImage}`)
+                        console.log(`[TMDb] Replacing with: ${tmdbImage.substring(0, 50)}...`)
                         episode.image = tmdbImage
+                    } else {
+                        console.log(`[TMDb] No TMDb image found for episode ${episode.episodeNumber}`)
                     }
                 }
             })
+        } else {
+            console.log("[TMDb] No anime or episodes found")
         }
         
         e.next()
@@ -35,7 +39,6 @@ function init() {
 
     $ui.register((ctx) => {
         console.log("[TMDb] UI context registered")
-        ctx.toast.info("TMDb Episode Provider activated")
     })
 }
 
