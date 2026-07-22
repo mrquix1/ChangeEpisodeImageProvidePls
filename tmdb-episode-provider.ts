@@ -3,7 +3,7 @@
 /// <reference path="./app.d.ts" />
 /// <reference path="./core.d.ts" />
 
-const TMDB_API_KEY = "YOUR_TMDB_API_KEY_HERE"
+const TMDB_API_KEY = "1a1c34ba2f8d63191cd5b163d74d1c52"
 const TMDB_BASE_URL = "https://api.themoviedb.org/3"
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 
