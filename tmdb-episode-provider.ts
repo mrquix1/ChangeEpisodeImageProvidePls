@@ -31,7 +31,12 @@ function init() {
     })
 
     $ui.register((ctx) => {
-        // UI context registered
+        // Invalidate queries to force UI refresh
+        try {
+            $app.invalidateClientQuery(["GetAnimeCollection", "GetRawAnimeCollection"])
+        } catch (err) {
+            // Silent
+        }
     })
 }
 
@@ -76,7 +81,7 @@ function getTmdbImage(anilistId) {
             }
         }
     } catch (error) {
-        // Silent error handling
+        // Silent
     }
     
     return null
