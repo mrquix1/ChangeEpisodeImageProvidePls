@@ -8,91 +8,95 @@ const TMDB_BASE_URL = "https://api.themoviedb.org/3"
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 
 function init() {
-    console.log("[TMDb] ========== INIT START ==========")
-    console.log("[TMDb] API Key configured: YES")
+    console.log("[TMDb] INIT START")
     
     $app.onGetAnimeCollection((e) => {
-        console.log("[TMDb] *** onGetAnimeCollection FIRED ***")
+        console.log("[TMDb] onGetAnimeCollection FIRED")
         
         if (!e.animeCollection) {
-            console.log("[TMDb] animeCollection is null/undefined")
+            console.log("[TMDb] animeCollection is NULL")
             e.next()
             return
         }
         
-        console.log("[TMDb] animeCollection exists!")
+        console.log("[TMDb] animeCollection KEYS:", Object.keys(e.animeCollection))
+        console.log("[TMDb] animeCollection type:", typeof e.animeCollection)
         
-        const mediaListCollection = e.animeCollection.mediaListCollection
-        if (!mediaListCollection) {
-            console.log("[TMDb] mediaListCollection is null/undefined")
-            e.next()
-            return
+        // Check all possible property names
+        console.log("[TMDb] mediaListCollection:", !!e.animeCollection.mediaListCollection)
+        console.log("[TMDb] MediaListCollection:", !!e.animeCollection.MediaListCollection)
+        console.log("[TMDb] lists:", !!e.animeCollection.lists)
+        console.log("[TMDb] entries:", !!e.animeCollection.entries)
+        
+        // Try to find lists anywhere
+        let lists = null
+        if (e.animeCollection.mediaListCollection?.lists) {
+            lists = e.animeCollection.mediaListCollection.lists
+            console.log("[TMDb] Found lists in mediaListCollection")
+        } else if (e.animeCollection.lists) {
+            lists = e.animeCollection.lists
+            console.log("[TMDb] Found lists directly in animeCollection")
+        } else if (Array.isArray(e.animeCollection)) {
+            lists = e.animeCollection
+            console.log("[TMDb] animeCollection IS an array!")
         }
         
-        console.log("[TMDb] mediaListCollection exists!")
-        
-        const lists = mediaListCollection.lists
-        if (!lists) {
-            console.log("[TMDb] lists is null/undefined")
-            e.next()
-            return
+        if (lists && lists.length > 0) {
+            console.log("[TMDb] SUCCESS! Found lists with", lists.length, "items")
+            processLists(lists)
+        } else {
+            console.log("[TMDb] No lists found anywhere")
         }
         
-        console.log("[TMDb] lists exists! Length:", lists.length)
-        
-        if (lists.length === 0) {
-            console.log("[TMDb] lists array is EMPTY")
-            e.next()
-            return
-        }
-        
-        console.log("[TMDb] Processing lists...")
-        let replacedCount = 0
-        
-        for (let i = 0; i < lists.length; i++) {
-            const list = lists[i]
-            if (!list || !list.entries) continue
-            
-            console.log(`[TMDb] List ${i}: ${list.entries.length} entries`)
-            
-            for (let j = 0; j < list.entries.length; j++) {
-                const entry = list.entries[j]
-                if (!entry || !entry.media) continue
-                
-                const mediaId = entry.media.id
-                const banner = entry.media.bannerImage
-                
-                if (banner && banner.includes("thetvdb")) {
-                    console.log(`[TMDb] *** FOUND TheTVDB BANNER for ${mediaId} ***`)
-                    console.log(`[TMDb] Original: ${banner.substring(0, 60)}...`)
-                    
-                    const newImage = getTmdbImage(mediaId)
-                    if (newImage) {
-                        console.log(`[TMDb] *** REPLACING with TMDb image ***`)
-                        entry.media.bannerImage = newImage
-                        console.log(`[TMDb] New: ${newImage.substring(0, 60)}...`)
-                        replacedCount++
-                    } else {
-                        console.log(`[TMDb] No TMDb image found`)
-                    }
-                }
-            }
-        }
-        
-        console.log(`[TMDb] *** REPLACED ${replacedCount} BANNERS ***`)
-        e.next()
-    })
-    
-    $app.onGetRawAnimeCollection((e) => {
-        console.log("[TMDb] *** onGetRawAnimeCollection FIRED ***")
         e.next()
     })
 
     $ui.register((ctx) => {
-        console.log("[TMDb] *** UI CONTEXT REGISTERED ***")
+        console.log("[TMDb] UI REGISTERED")
     })
     
-    console.log("[TMDb] ========== INIT COMPLETE ==========")
+    console.log("[TMDb] INIT COMPLETE")
+}
+
+function processLists(lists) {
+    let replacedCount = 0
+    
+    for (let i = 0; i < lists.length; i++) {
+        const list = lists[i]
+        if (!list) continue
+        
+        console.log(`[TMDb] List ${i} keys:`, Object.keys(list))
+        
+        let entries = null
+        if (list.entries) {
+            entries = list.entries
+        } else if (list.mediaListCollection?.lists) {
+            entries = list.mediaListCollection.lists
+        }
+        
+        if (!entries) continue
+        
+        console.log(`[TMDb] List ${i}: ${entries.length} entries`)
+        
+        for (let j = 0; j < entries.length; j++) {
+            const entry = entries[j]
+            if (!entry || !entry.media) continue
+            
+            const banner = entry.media.bannerImage
+            if (banner && banner.includes("thetvdb")) {
+                console.log(`[TMDb] FOUND TheTVDB for ${entry.media.id}`)
+                
+                const newImage = getTmdbImage(entry.media.id)
+                if (newImage) {
+                    entry.media.bannerImage = newImage
+                    replacedCount++
+                    console.log(`[TMDb] REPLACED`)
+                }
+            }
+        }
+    }
+    
+    console.log(`[TMDb] TOTAL REPLACED: ${replacedCount}`)
 }
 
 function getTmdbImage(anilistId) {
