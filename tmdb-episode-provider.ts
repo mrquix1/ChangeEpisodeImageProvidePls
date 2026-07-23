@@ -9,119 +9,106 @@ const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 
 function init() {
     console.log("[TMDb] ========== INIT START ==========")
-    console.log("[TMDb] API Key configured:", TMDB_API_KEY ? "YES" : "NO")
-    
-    // Test all possible hooks
-    console.log("[TMDb] Registering all hooks...")
+    console.log("[TMDb] API Key configured: YES")
     
     $app.onGetAnimeCollection((e) => {
         console.log("[TMDb] *** onGetAnimeCollection FIRED ***")
-        debugEvent(e, "onGetAnimeCollection")
+        
+        if (!e.animeCollection) {
+            console.log("[TMDb] animeCollection is null/undefined")
+            e.next()
+            return
+        }
+        
+        console.log("[TMDb] animeCollection exists!")
+        
+        const mediaListCollection = e.animeCollection.mediaListCollection
+        if (!mediaListCollection) {
+            console.log("[TMDb] mediaListCollection is null/undefined")
+            e.next()
+            return
+        }
+        
+        console.log("[TMDb] mediaListCollection exists!")
+        
+        const lists = mediaListCollection.lists
+        if (!lists) {
+            console.log("[TMDb] lists is null/undefined")
+            e.next()
+            return
+        }
+        
+        console.log("[TMDb] lists exists! Length:", lists.length)
+        
+        if (lists.length === 0) {
+            console.log("[TMDb] lists array is EMPTY")
+            e.next()
+            return
+        }
+        
+        console.log("[TMDb] Processing lists...")
+        let replacedCount = 0
+        
+        for (let i = 0; i < lists.length; i++) {
+            const list = lists[i]
+            if (!list || !list.entries) continue
+            
+            console.log(`[TMDb] List ${i}: ${list.entries.length} entries`)
+            
+            for (let j = 0; j < list.entries.length; j++) {
+                const entry = list.entries[j]
+                if (!entry || !entry.media) continue
+                
+                const mediaId = entry.media.id
+                const banner = entry.media.bannerImage
+                
+                if (banner && banner.includes("thetvdb")) {
+                    console.log(`[TMDb] *** FOUND TheTVDB BANNER for ${mediaId} ***`)
+                    console.log(`[TMDb] Original: ${banner.substring(0, 60)}...`)
+                    
+                    const newImage = getTmdbImage(mediaId)
+                    if (newImage) {
+                        console.log(`[TMDb] *** REPLACING with TMDb image ***`)
+                        entry.media.bannerImage = newImage
+                        console.log(`[TMDb] New: ${newImage.substring(0, 60)}...`)
+                        replacedCount++
+                    } else {
+                        console.log(`[TMDb] No TMDb image found`)
+                    }
+                }
+            }
+        }
+        
+        console.log(`[TMDb] *** REPLACED ${replacedCount} BANNERS ***`)
         e.next()
     })
     
     $app.onGetRawAnimeCollection((e) => {
         console.log("[TMDb] *** onGetRawAnimeCollection FIRED ***")
-        debugEvent(e, "onGetRawAnimeCollection")
         e.next()
     })
-    
-    $app.onScanCompleted((e) => {
-        console.log("[TMDb] *** onScanCompleted FIRED ***")
-        e.next()
-    })
-    
-    $app.onAnimeEntryLibraryDataRequested((e) => {
-        console.log("[TMDb] *** onAnimeEntryLibraryDataRequested FIRED ***")
-        console.log("[TMDb] Entry ID:", e.entry?.media?.id)
-        console.log("[TMDb] Files count:", e.entryLocalFiles?.length)
-        e.next()
-    })
-    
+
     $ui.register((ctx) => {
         console.log("[TMDb] *** UI CONTEXT REGISTERED ***")
-        console.log("[TMDb] ctx type:", typeof ctx)
-        console.log("[TMDb] ctx keys:", Object.keys(ctx || {}))
-        
-        // Try to access collection via ctx
-        if (ctx && typeof ctx === 'object') {
-            console.log("[TMDb] Checking ctx for collection access...")
-            
-            // Check if we can get data somehow
-            try {
-                console.log("[TMDb] ctx.store exists:", !!ctx.store)
-                console.log("[TMDb] ctx.screen exists:", !!ctx.screen)
-            } catch (err) {
-                console.error("[TMDb] Error checking ctx:", err)
-            }
-        }
-        
-        console.log("[TMDb] UI Context setup complete")
     })
     
     console.log("[TMDb] ========== INIT COMPLETE ==========")
 }
 
-function debugEvent(e, hookName) {
-    console.log(`[TMDb] === Debugging ${hookName} ===`)
-    console.log("[TMDb] Event object keys:", Object.keys(e || {}))
-    
-    if (!e) {
-        console.log("[TMDb] Event is null/undefined!")
-        return
-    }
-    
-    // Check animeCollection
-    console.log("[TMDb] e.animeCollection:", !!e.animeCollection)
-    console.log("[TMDb] e.animeCollection type:", typeof e.animeCollection)
-    
-    if (e.animeCollection) {
-        console.log("[TMDb] animeCollection keys:", Object.keys(e.animeCollection))
-        console.log("[TMDb] animeCollection.mediaListCollection:", !!e.animeCollection.mediaListCollection)
-        console.log("[TMDb] animeCollection type:", typeof e.animeCollection)
+function getTmdbImage(anilistId) {
+    try {
+        const url = `${TMDB_BASE_URL}/find/${anilistId}?api_key=${TMDB_API_KEY}&external_source=anilist_id`
+        const response = fetch(url)
         
-        if (e.animeCollection.mediaListCollection) {
-            const mlc = e.animeCollection.mediaListCollection
-            console.log("[TMDb] mediaListCollection keys:", Object.keys(mlc))
-            console.log("[TMDb] lists exists:", !!mlc.lists)
-            console.log("[TMDb] lists type:", typeof mlc.lists)
-            
-            if (mlc.lists) {
-                console.log("[TMDb] lists length:", mlc.lists.length)
-                console.log("[TMDb] lists is array:", Array.isArray(mlc.lists))
-                
-                if (mlc.lists.length > 0) {
-                    console.log("[TMDb] First list keys:", Object.keys(mlc.lists[0] || {}))
-                    console.log("[TMDb] First list entries:", !!mlc.lists[0]?.entries)
-                    console.log("[TMDb] First list entries length:", mlc.lists[0]?.entries?.length)
-                    
-                    if (mlc.lists[0]?.entries?.length > 0) {
-                        const firstEntry = mlc.lists[0].entries[0]
-                        console.log("[TMDb] First entry keys:", Object.keys(firstEntry || {}))
-                        console.log("[TMDb] First entry media:", !!firstEntry?.media)
-                        console.log("[TMDb] First entry media keys:", Object.keys(firstEntry?.media || {}))
-                        console.log("[TMDb] First entry banner:", firstEntry?.media?.bannerImage?.substring(0, 80) || "NONE")
-                        
-                        // TRY TO MODIFY
-                        if (firstEntry?.media?.bannerImage?.includes("thetvdb")) {
-                            console.log("[TMDb] *** FOUND TheTVDB IMAGE - ATTEMPTING MODIFICATION ***")
-                            console.log("[TMDb] Original:", firstEntry.media.bannerImage)
-                            firstEntry.media.bannerImage = "https://test-replacement.jpg"
-                            console.log("[TMDb] After modification:", firstEntry.media.bannerImage)
-                        }
-                    }
-                } else {
-                    console.log("[TMDb] Lists array is empty")
-                }
-            } else {
-                console.log("[TMDb] Lists is null/undefined/not iterable")
+        if (response && response.tv_results && response.tv_results.length > 0) {
+            const show = response.tv_results[0]
+            if (show.backdrop_path) {
+                return TMDB_IMAGE_BASE_URL + show.backdrop_path
             }
-        } else {
-            console.log("[TMDb] mediaListCollection is null/undefined")
         }
-    } else {
-        console.log("[TMDb] animeCollection is null/undefined")
+    } catch (error) {
+        console.error(`[TMDb] Fetch error:`, error)
     }
     
-    console.log(`[TMDb] === End ${hookName} ===`)
+    return null
 }
