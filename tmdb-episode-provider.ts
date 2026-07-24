@@ -16,10 +16,7 @@ function init() {
                 const mediaId = Number(e.searchParams.id)
                 console.log("[TMDb] On entry page, mediaId:", mediaId)
                 
-                // Wait for DOM to render
-                setTimeout(() => {
-                    console.log("[TMDb] Looking for episode images...")
-                    
+                try {
                     // Find all episode images with data-episode-card-image="true"
                     const images = document.querySelectorAll('[data-episode-card-image="true"]')
                     console.log("[TMDb] Found", images.length, "episode images")
@@ -28,17 +25,17 @@ function init() {
                         const currentSrc = img.getAttribute('src')
                         console.log("[TMDb] Image", idx, "src:", currentSrc)
                         
-                        if (currentSrc && currentSrc.includes("thetvdb")) {
-                            console.log("[TMDb] Image", idx, "is TheTVDB - replacing")
-                            
+                        if (currentSrc && currentSrc.indexOf("thetvdb") !== -1) {
                             const tmdbImage = getTmdbImage(mediaId)
                             if (tmdbImage) {
                                 img.setAttribute('src', tmdbImage)
-                                console.log("[TMDb] Image", idx, "REPLACED with:", tmdbImage)
+                                console.log("[TMDb] Image", idx, "REPLACED")
                             }
                         }
                     })
-                }, 1000)
+                } catch (err) {
+                    console.error("[TMDb] Error:", err)
+                }
             }
         })
     })
