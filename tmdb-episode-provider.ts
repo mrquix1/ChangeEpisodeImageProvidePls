@@ -9,31 +9,36 @@ const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 
 function init() {
     $ui.register((ctx) => {
-        console.log("[TMDb] UI registered")
+        console.log("[TMDb] UI registered - DOM manipulation mode")
         
         ctx.screen.onNavigate((e) => {
             if (e.pathname === "/entry") {
                 const mediaId = Number(e.searchParams.id)
-                console.log("[TMDb] Entry page for media:", mediaId)
+                console.log("[TMDb] Navigated to entry:", mediaId)
                 
-                ctx.anime.getAnimeEntry(mediaId).then((result) => {
-                    const media = result.media
-                    if (!media) return
-                    
-                    console.log("[TMDb] Current banner:", media.bannerImage?.substring(0, 80))
-                    
-                    // Get TMDb image
-                    const tmdbImage = getTmdbImage(mediaId)
-                    if (tmdbImage) {
-                        console.log("[TMDb] Got TMDb image, replacing...")
-                        media.bannerImage = tmdbImage
-                        console.log("[TMDb] REPLACED! New banner:", tmdbImage.substring(0, 80))
-                    } else {
-                        console.log("[TMDb] No TMDb image found")
+                // Wait for DOM to be ready
+                setTimeout(() => {
+                    try {
+                        // Find all episode images
+                        const images = document.querySelectorAll('[data-episode-card-image="true"]')
+                        console.log("[TMDb] Found", images.length, "episode images")
+                        
+                        images.forEach((img, idx) => {
+                            const src = img.getAttribute('src')
+                            console.log("[TMDb] Image", idx, "src:", src?.substring(0, 60))
+                            
+                            if (src && src.includes("thetvdb")) {
+                                const tmdbImage = getTmdbImage(mediaId)
+                                if (tmdbImage) {
+                                    img.setAttribute('src', tmdbImage)
+                                    console.log("[TMDb] REPLACED image", idx)
+                                }
+                            }
+                        })
+                    } catch (err) {
+                        console.error("[TMDb] DOM error:", err)
                     }
-                }).catch((err) => {
-                    console.error("[TMDb] Error:", err)
-                })
+                }, 500)
             }
         })
     })
