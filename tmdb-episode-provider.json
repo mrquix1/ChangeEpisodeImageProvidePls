@@ -1,7 +1,7 @@
 {
     "id": "tmdb-episode-provider",
     "name": "TMDb Episode Provider",
-    "version": "5.0.4",
+    "version": "5.0.5",
     "manifestURI": "https://raw.githubusercontent.com/mrquix1/ChangeEpisodeImageProvidePls/main/tmdb-episode-provider.json",
     "language": "typescript",
     "type": "plugin",
