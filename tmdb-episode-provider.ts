@@ -9,44 +9,36 @@ const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 
 function init() {
     $ui.register((ctx) => {
-        console.log("[TMDb] Initialized - listening for navigation")
+        console.log("[TMDb] Initialized")
         
         ctx.screen.onNavigate((e) => {
-            // CHECK 1: Are we on an entry page?
             if (e.pathname === "/entry") {
-                // CHECK 2: Get the mediaId from URL
                 const mediaId = Number(e.searchParams.id)
-                console.log("[TMDb] Entry page detected, mediaId:", mediaId)
+                console.log("[TMDb] On entry page, mediaId:", mediaId)
                 
-                // Get the anime entry
-                ctx.anime.getAnimeEntry(mediaId).then((result) => {
-                    const media = result.media
-                    console.log("[TMDb] Got anime entry")
+                // Wait for DOM to render
+                setTimeout(() => {
+                    console.log("[TMDb] Looking for episode images...")
                     
-                    // CHECK 3: Does it have a banner image?
-                    if (media && media.bannerImage) {
-                        console.log("[TMDb] Current banner:", media.bannerImage.substring(0, 60))
+                    // Find all episode images with data-episode-card-image="true"
+                    const images = document.querySelectorAll('[data-episode-card-image="true"]')
+                    console.log("[TMDb] Found", images.length, "episode images")
+                    
+                    images.forEach((img, idx) => {
+                        const currentSrc = img.getAttribute('src')
+                        console.log("[TMDb] Image", idx, "src:", currentSrc)
                         
-                        // Get TMDb image
-                        const tmdbImage = getTmdbImage(mediaId)
-                        if (tmdbImage) {
-                            console.log("[TMDb] Replacing with TMDb image")
-                            media.bannerImage = tmdbImage
+                        if (currentSrc && currentSrc.includes("thetvdb")) {
+                            console.log("[TMDb] Image", idx, "is TheTVDB - replacing")
                             
-                            // Force UI refresh
-                            try {
-                                $app.invalidateClientQuery(["GetAnimeEntry", "GetAnimeCollection"])
-                                console.log("[TMDb] Query invalidated - UI should update")
-                            } catch (err) {
-                                console.error("[TMDb] Invalidation error:", err)
+                            const tmdbImage = getTmdbImage(mediaId)
+                            if (tmdbImage) {
+                                img.setAttribute('src', tmdbImage)
+                                console.log("[TMDb] Image", idx, "REPLACED with:", tmdbImage)
                             }
                         }
-                    } else {
-                        console.log("[TMDb] No banner image found")
-                    }
-                }).catch((err) => {
-                    console.error("[TMDb] Error getting anime entry:", err)
-                })
+                    })
+                }, 1000)
             }
         })
     })
@@ -60,16 +52,12 @@ function getTmdbImage(anilistId) {
         if (response && response.tv_results && response.tv_results.length > 0) {
             const show = response.tv_results[0]
             if (show.backdrop_path) {
-                const imageUrl = TMDB_IMAGE_BASE_URL + show.backdrop_path
-                console.log("[TMDb] Got TMDb image URL")
-                return imageUrl
+                return TMDB_IMAGE_BASE_URL + show.backdrop_path
             }
         }
-        
-        console.log("[TMDb] No TMDb results found")
-        return null
     } catch (error) {
-        console.error("[TMDb] Fetch error:", error)
-        return null
+        console.error("[TMDb] Error:", error)
     }
+    
+    return null
 }
