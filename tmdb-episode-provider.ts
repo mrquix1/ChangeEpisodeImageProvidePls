@@ -10,137 +10,70 @@ const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 let imageCache = {}
 
 function init() {
-    console.log("[TMDb] ===== FINAL VERSION LOADED =====")
-    
     $app.onGetAnimeCollection((e) => {
-        console.log("[TMDb] onGetAnimeCollection FIRED")
-        processAndReplace(e)
-    })
-    
-    $app.onGetRawAnimeCollection((e) => {
-        console.log("[TMDb] onGetRawAnimeCollection FIRED")
-        processAndReplace(e)
-    })
-
-    $ui.register((ctx) => {
-        console.log("[TMDb] UI Context - Invalidating all queries")
-        
-        try {
-            // Invalidate ALL anime collection related queries
-            $app.invalidateClientQuery([
-                "GetAnimeCollection",
-                "GetRawAnimeCollection", 
-                "GetAnimeCollectionByStatus",
-                "GetAnimeCollectionManagementRelations"
-            ])
-            console.log("[TMDb] Query invalidation SUCCESSFUL")
-        } catch (err) {
-            console.error("[TMDb] Query invalidation error:", err)
-        }
-    })
-    
-    console.log("[TMDb] ===== FINAL VERSION READY =====")
-}
-
-function processAndReplace(e) {
-    if (!e.animeCollection) {
-        console.log("[TMDb] No collection")
-        e.next()
-        return
-    }
-    
-    let lists = null
-    
-    // Try to find lists in various possible locations
-    if (e.animeCollection.mediaListCollection?.lists) {
-        lists = e.animeCollection.mediaListCollection.lists
-    } else if (e.animeCollection.lists) {
-        lists = e.animeCollection.lists
-    } else if (Array.isArray(e.animeCollection)) {
-        lists = e.animeCollection
-    }
-    
-    if (!lists || lists.length === 0) {
-        console.log("[TMDb] No lists found")
-        e.next()
-        return
-    }
-    
-    console.log("[TMDb] Processing", lists.length, "lists")
-    
-    let totalReplaced = 0
-    
-    for (let i = 0; i < lists.length; i++) {
-        const list = lists[i]
-        if (!list) continue
-        
-        let entries = null
-        
-        // Find entries in various possible locations
-        if (list.entries) {
-            entries = list.entries
-        } else if (list.mediaListCollection?.lists) {
-            entries = list.mediaListCollection.lists
+        if (!e || !e.animeCollection) {
+            e.next()
+            return
         }
         
-        if (!entries || entries.length === 0) continue
+        let lists = null
+        if (e.animeCollection.mediaListCollection?.lists) {
+            lists = e.animeCollection.mediaListCollection.lists
+        } else if (e.animeCollection.lists) {
+            lists = e.animeCollection.lists
+        }
         
-        console.log("[TMDb] List", i, "has", entries.length, "entries")
-        
-        for (let j = 0; j < entries.length; j++) {
-            const entry = entries[j]
+        if (lists && lists.length > 0) {
+            let replaced = 0
             
-            // Skip if no entry or media
-            if (!entry || !entry.media) continue
-            
-            const mediaId = entry.media.id
-            const currentBanner = entry.media.bannerImage
-            
-            // Only process TheTVDB images
-            if (currentBanner && currentBanner.includes("thetvdb")) {
-                console.log("[TMDb] Media", mediaId, "- Found TheTVDB, fetching TMDb...")
+            for (let i = 0; i < lists.length; i++) {
+                const list = lists[i]
+                if (!list || !list.entries) continue
                 
-                const tmdbImage = getTmdbImage(mediaId)
-                
-                if (tmdbImage) {
-                    console.log("[TMDb] Media", mediaId, "- REPLACING image")
-                    entry.media.bannerImage = tmdbImage
-                    totalReplaced++
-                } else {
-                    console.log("[TMDb] Media", mediaId, "- No TMDb image found")
+                for (let j = 0; j < list.entries.length; j++) {
+                    const entry = list.entries[j]
+                    if (!entry || !entry.media) continue
+                    
+                    const banner = entry.media.bannerImage
+                    if (banner && banner.includes("thetvdb")) {
+                        const newImage = getTmdbImage(entry.media.id)
+                        if (newImage) {
+                            entry.media.bannerImage = newImage
+                            replaced++
+                        }
+                    }
                 }
             }
         }
-    }
-    
-    console.log("[TMDb] ===== REPLACED", totalReplaced, 'IMAGES =====')
-    e.next()
+        
+        e.next()
+    })
+
+    $ui.register((ctx) => {
+        // Empty - no invalidation
+    })
 }
 
 function getTmdbImage(anilistId) {
-    // Check cache first
     if (imageCache[anilistId]) {
         return imageCache[anilistId]
     }
     
     try {
-        const url = `${TMDB_BASE_URL}/find/${anilistId}?api_key=${TMDB_API_KEY}&external_source=anilist_id`
+        const url = TMDB_BASE_URL + "/find/" + anilistId + "?api_key=" + TMDB_API_KEY + "&external_source=anilist_id"
         const response = fetch(url)
         
         if (response && response.tv_results && response.tv_results.length > 0) {
             const show = response.tv_results[0]
-            
             if (show.backdrop_path) {
                 const imageUrl = TMDB_IMAGE_BASE_URL + show.backdrop_path
                 imageCache[anilistId] = imageUrl
-                console.log("[TMDb] Cached image for", anilistId)
                 return imageUrl
             }
         }
-        
-        return null
     } catch (error) {
-        console.error("[TMDb] Fetch error for", anilistId, ":", error)
-        return null
+        // Silent
     }
+    
+    return null
 }
