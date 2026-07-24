@@ -9,29 +9,30 @@ const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 
 function init() {
     $ui.register((ctx) => {
-        console.log("[TMDb] UI registered - hooking into navigation")
+        console.log("[TMDb] UI registered")
         
         ctx.screen.onNavigate((e) => {
-            console.log("[TMDb] Navigation triggered:", e.pathname)
-            
             if (e.pathname === "/entry") {
                 const mediaId = Number(e.searchParams.id)
                 console.log("[TMDb] Entry page for media:", mediaId)
                 
                 ctx.anime.getAnimeEntry(mediaId).then((result) => {
                     const media = result.media
-                    console.log("[TMDb] Got media, banner:", media?.bannerImage?.substring(0, 50))
+                    if (!media) return
                     
-                    if (media && media.bannerImage && media.bannerImage.includes("thetvdb")) {
-                        console.log("[TMDb] Found TheTVDB, fetching TMDb...")
-                        const newImage = getTmdbImage(mediaId)
-                        if (newImage) {
-                            media.bannerImage = newImage
-                            console.log("[TMDb] REPLACED banner!")
-                        }
+                    console.log("[TMDb] Current banner:", media.bannerImage?.substring(0, 80))
+                    
+                    // Get TMDb image
+                    const tmdbImage = getTmdbImage(mediaId)
+                    if (tmdbImage) {
+                        console.log("[TMDb] Got TMDb image, replacing...")
+                        media.bannerImage = tmdbImage
+                        console.log("[TMDb] REPLACED! New banner:", tmdbImage.substring(0, 80))
+                    } else {
+                        console.log("[TMDb] No TMDb image found")
                     }
                 }).catch((err) => {
-                    console.error("[TMDb] Error getting anime entry:", err)
+                    console.error("[TMDb] Error:", err)
                 })
             }
         })
