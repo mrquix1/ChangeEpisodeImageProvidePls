@@ -7,10 +7,12 @@ const TMDB_API_KEY = "1a1c34ba2f8d63191cd5b163d74d1c52"
 const TMDB_BASE_URL = "https://api.themoviedb.org/3"
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 
-let imageCache = {}
-
 function init() {
+    console.log("[TMDb] Extension initialized with storage")
+    
     $app.onGetAnimeCollection((e) => {
+        console.log("[TMDb] onGetAnimeCollection FIRED")
+        
         if (!e || !e.animeCollection) {
             e.next()
             return
@@ -24,7 +26,8 @@ function init() {
         }
         
         if (lists && lists.length > 0) {
-            let replaced = 0
+            console.log("[TMDb] Processing and storing images...")
+            let stored = 0
             
             for (let i = 0; i < lists.length; i++) {
                 const list = lists[i]
@@ -34,31 +37,37 @@ function init() {
                     const entry = list.entries[j]
                     if (!entry || !entry.media) continue
                     
+                    const mediaId = entry.media.id
                     const banner = entry.media.bannerImage
+                    
                     if (banner && banner.includes("thetvdb")) {
-                        const newImage = getTmdbImage(entry.media.id)
+                        console.log("[TMDb] Getting TMDb image for", mediaId)
+                        const newImage = getTmdbImage(mediaId)
+                        
                         if (newImage) {
+                            // Store in persistent storage
+                            $storage.set("tmdb.image." + mediaId, newImage)
+                            // Also replace in current collection
                             entry.media.bannerImage = newImage
-                            replaced++
+                            stored++
+                            console.log("[TMDb] Stored image for", mediaId)
                         }
                     }
                 }
             }
+            
+            console.log("[TMDb] Stored", stored, "images in storage")
         }
         
         e.next()
     })
 
     $ui.register((ctx) => {
-        // Empty - no invalidation
+        console.log("[TMDb] UI registered")
     })
 }
 
 function getTmdbImage(anilistId) {
-    if (imageCache[anilistId]) {
-        return imageCache[anilistId]
-    }
-    
     try {
         const url = TMDB_BASE_URL + "/find/" + anilistId + "?api_key=" + TMDB_API_KEY + "&external_source=anilist_id"
         const response = fetch(url)
@@ -66,13 +75,11 @@ function getTmdbImage(anilistId) {
         if (response && response.tv_results && response.tv_results.length > 0) {
             const show = response.tv_results[0]
             if (show.backdrop_path) {
-                const imageUrl = TMDB_IMAGE_BASE_URL + show.backdrop_path
-                imageCache[anilistId] = imageUrl
-                return imageUrl
+                return TMDB_IMAGE_BASE_URL + show.backdrop_path
             }
         }
     } catch (error) {
-        // Silent
+        console.error("[TMDb] Fetch error:", error)
     }
     
     return null
