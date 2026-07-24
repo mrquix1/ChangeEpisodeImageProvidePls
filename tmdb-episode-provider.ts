@@ -8,58 +8,94 @@ const TMDB_BASE_URL = "https://api.themoviedb.org/3"
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 
 function init() {
-    console.log("[TMDb] Extension initialized with storage")
-    
     $app.onGetAnimeCollection((e) => {
-        console.log("[TMDb] onGetAnimeCollection FIRED")
-        
-        if (!e || !e.animeCollection) {
-            e.next()
-            return
-        }
-        
-        let lists = null
-        if (e.animeCollection.mediaListCollection?.lists) {
-            lists = e.animeCollection.mediaListCollection.lists
-        } else if (e.animeCollection.lists) {
-            lists = e.animeCollection.lists
-        }
-        
-        if (lists && lists.length > 0) {
-            console.log("[TMDb] Processing and storing images...")
-            let stored = 0
+        try {
+            console.log("[TMDb] onGetAnimeCollection FIRED")
             
-            for (let i = 0; i < lists.length; i++) {
-                const list = lists[i]
-                if (!list || !list.entries) continue
-                
-                for (let j = 0; j < list.entries.length; j++) {
-                    const entry = list.entries[j]
-                    if (!entry || !entry.media) continue
-                    
-                    const mediaId = entry.media.id
-                    const banner = entry.media.bannerImage
-                    
-                    if (banner && banner.includes("thetvdb")) {
-                        console.log("[TMDb] Getting TMDb image for", mediaId)
-                        const newImage = getTmdbImage(mediaId)
-                        
-                        if (newImage) {
-                            // Store in persistent storage
-                            $storage.set("tmdb.image." + mediaId, newImage)
-                            // Also replace in current collection
-                            entry.media.bannerImage = newImage
-                            stored++
-                            console.log("[TMDb] Stored image for", mediaId)
-                        }
-                    }
+            if (!e) {
+                console.log("[TMDb] Event is null")
+                return
+            }
+            
+            console.log("[TMDb] Event exists, checking animeCollection")
+            
+            if (!e.animeCollection) {
+                console.log("[TMDb] animeCollection is null")
+                e.next()
+                return
+            }
+            
+            console.log("[TMDb] animeCollection exists")
+            
+            // Direct access attempt
+            let lists = null
+            try {
+                if (e.animeCollection.mediaListCollection) {
+                    console.log("[TMDb] Found mediaListCollection")
+                    lists = e.animeCollection.mediaListCollection.lists
+                }
+            } catch (err) {
+                console.error("[TMDb] Error accessing mediaListCollection:", err)
+            }
+            
+            if (!lists) {
+                try {
+                    lists = e.animeCollection.lists
+                    console.log("[TMDb] Found lists directly")
+                } catch (err) {
+                    console.error("[TMDb] Error accessing lists:", err)
                 }
             }
             
-            console.log("[TMDb] Stored", stored, "images in storage")
+            if (!lists) {
+                console.log("[TMDb] No lists found")
+                e.next()
+                return
+            }
+            
+            console.log("[TMDb] Found lists, length:", lists.length)
+            
+            if (lists.length > 0) {
+                let replaced = 0
+                
+                for (let i = 0; i < lists.length; i++) {
+                    try {
+                        const list = lists[i]
+                        if (!list) continue
+                        
+                        const entries = list.entries
+                        if (!entries) continue
+                        
+                        for (let j = 0; j < entries.length; j++) {
+                            try {
+                                const entry = entries[j]
+                                if (!entry || !entry.media) continue
+                                
+                                const banner = entry.media.bannerImage
+                                if (banner && banner.indexOf("thetvdb") !== -1) {
+                                    const newImage = getTmdbImage(entry.media.id)
+                                    if (newImage) {
+                                        entry.media.bannerImage = newImage
+                                        replaced++
+                                    }
+                                }
+                            } catch (err) {
+                                console.error("[TMDb] Error processing entry:", err)
+                            }
+                        }
+                    } catch (err) {
+                        console.error("[TMDb] Error processing list:", err)
+                    }
+                }
+                
+                console.log("[TMDb] REPLACED", replaced, "images")
+            }
+            
+            e.next()
+        } catch (err) {
+            console.error("[TMDb] Fatal error:", err)
+            e.next()
         }
-        
-        e.next()
     })
 
     $ui.register((ctx) => {
