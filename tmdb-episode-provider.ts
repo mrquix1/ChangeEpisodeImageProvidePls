@@ -8,43 +8,40 @@ const TMDB_BASE_URL = "https://api.themoviedb.org/3"
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 
 function init() {
-    $ui.register((ctx) => {
-        console.log("[TMDb] Initialized with maximum effort")
+    $app.onAnimeMetadataRequested((e) => {
+        console.log("[TMDb] onAnimeMetadataRequested fired")
         
-        ctx.screen.onNavigate((e) => {
-            if (e.pathname === "/entry") {
-                const mediaId = Number(e.searchParams.id)
-                console.log("[TMDb] Entry page, mediaId:", mediaId)
-                
-                ctx.anime.getAnimeEntry(mediaId).then((result) => {
-                    const media = result.media
-                    if (!media) {
-                        console.log("[TMDb] No media found")
-                        return
-                    }
-                    
-                    console.log("[TMDb] Got media, getting TMDb image")
-                    const tmdbImage = getTmdbImage(mediaId)
-                    
-                    if (tmdbImage) {
-                        console.log("[TMDb] Got TMDb image:", tmdbImage)
-                        media.bannerImage = tmdbImage
-                        media.coverImage = { large: tmdbImage, medium: tmdbImage }
-                        
-                        console.log("[TMDb] Set images, invalidating queries")
-                        try {
-                            $app.invalidateClientQuery(["GetAnimeEntry"])
-                            $app.invalidateClientQuery(["GetAnimeCollection"])
-                            console.log("[TMDb] Queries invalidated")
-                        } catch (err) {
-                            console.error("[TMDb] Invalidation failed:", err)
-                        }
-                    }
-                }).catch((err) => {
-                    console.error("[TMDb] Error:", err)
-                })
+        if (!e.animeMetadata || !e.animeMetadata.episodes) {
+            console.log("[TMDb] No episodes found")
+            e.next()
+            return
+        }
+        
+        const episodes = e.animeMetadata.episodes
+        const mediaId = e.animeMetadata.mediaId
+        console.log("[TMDb] Processing episodes for media:", mediaId)
+        
+        let replaced = 0
+        for (const key in episodes) {
+            const episode = episodes[key]
+            if (!episode || !episode.image) continue
+            
+            console.log("[TMDb] Episode", key, "image:", episode.image.substring(0, 60))
+            
+            if (episode.image.indexOf("thetvdb") !== -1) {
+                console.log("[TMDb] Found TheTVDB episode image")
+                const tmdbImage = getTmdbImage(mediaId)
+                if (tmdbImage) {
+                    episode.image = tmdbImage
+                    episode.hasImage = true
+                    replaced++
+                    console.log("[TMDb] Replaced episode", key)
+                }
             }
-        })
+        }
+        
+        console.log("[TMDb] REPLACED", replaced, "episode images")
+        e.next()
     })
 }
 
@@ -56,16 +53,12 @@ function getTmdbImage(anilistId) {
         if (response && response.tv_results && response.tv_results.length > 0) {
             const show = response.tv_results[0]
             if (show.backdrop_path) {
-                const imageUrl = TMDB_IMAGE_BASE_URL + show.backdrop_path
-                console.log("[TMDb] Got TMDb URL")
-                return imageUrl
+                return TMDB_IMAGE_BASE_URL + show.backdrop_path
             }
         }
-        
-        console.log("[TMDb] No TMDb image found")
-        return null
     } catch (error) {
-        console.error("[TMDb] Fetch failed:", error)
-        return null
+        console.error("[TMDb] Error:", error)
     }
+    
+    return null
 }
