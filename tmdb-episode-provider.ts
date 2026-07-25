@@ -12,35 +12,54 @@ function init() {
         console.log("[TMDb] onAnimeMetadata fired, mediaId:", e.mediaId)
         
         if (!e.animeMetadata || !e.animeMetadata.episodes) {
-            console.log("[TMDb] No episodes")
             e.next()
             return
         }
         
         const tmdbId = getTmdbIdFromAnilist(e.mediaId)
         if (!tmdbId) {
-            console.log("[TMDb] No TMDb ID")
             e.next()
             return
         }
         
         console.log("[TMDb] TMDb ID:", tmdbId)
         
+        // Get show info to find total seasons
+        const showUrl = TMDB_BASE_URL + "/tv/" + tmdbId + "?api_key=" + TMDB_API_KEY
+        const showResponse = fetch(showUrl)
+        
+        if (!showResponse || !showResponse.seasons) {
+            e.next()
+            return
+        }
+        
         let replaced = 0
-        for (const key in e.animeMetadata.episodes) {
-            const episode = e.animeMetadata.episodes[key]
-            if (!episode.image) continue
+        
+        // Try all seasons
+        for (let seasonIdx = 0; seasonIdx < showResponse.seasons.length; seasonIdx++) {
+            const season = showResponse.seasons[seasonIdx]
+            const seasonNum = season.season_number
             
-            if (episode.image.indexOf("thetvdb") !== -1) {
-                // Episode key format: "e1", "e2", etc
-                const episodeNum = parseInt(key.substring(1))
-                console.log("[TMDb] Processing episode", episodeNum)
+            console.log("[TMDb] Fetching season", seasonNum)
+            
+            const seasonUrl = TMDB_BASE_URL + "/tv/" + tmdbId + "/season/" + seasonNum + "?api_key=" + TMDB_API_KEY
+            const seasonResponse = fetch(seasonUrl)
+            
+            if (!seasonResponse || !seasonResponse.episodes) continue
+            
+            for (let epIdx = 0; epIdx < seasonResponse.episodes.length; epIdx++) {
+                const tmdbEpisode = seasonResponse.episodes[epIdx]
+                const episodeNum = tmdbEpisode.episode_number
+                const key = "e" + episodeNum
                 
-                const tmdbImage = getTmdbEpisodeImage(tmdbId, 1, episodeNum)
-                if (tmdbImage) {
-                    episode.image = tmdbImage
-                    replaced++
-                    console.log("[TMDb] Replaced episode", key, "with:", tmdbImage.substring(0, 60))
+                if (e.animeMetadata.episodes[key] && e.animeMetadata.episodes[key].image) {
+                    if (e.animeMetadata.episodes[key].image.indexOf("thetvdb") !== -1) {
+                        if (tmdbEpisode.still_path) {
+                            e.animeMetadata.episodes[key].image = TMDB_IMAGE_BASE_URL + tmdbEpisode.still_path
+                            replaced++
+                            console.log("[TMDb] Replaced E" + episodeNum)
+                        }
+                    }
                 }
             }
         }
@@ -60,27 +79,6 @@ function getTmdbIdFromAnilist(anilistId) {
         }
     } catch (error) {
         console.error("[TMDb] Error:", error)
-    }
-    
-    return null
-}
-
-function getTmdbEpisodeImage(tmdbId, seasonNumber, episodeNumber) {
-    try {
-        const url = TMDB_BASE_URL + "/tv/" + tmdbId + "/season/" + seasonNumber + "/episode/" + episodeNumber + "?api_key=" + TMDB_API_KEY
-        const response = fetch(url)
-        
-        console.log("[TMDb] Fetching S" + seasonNumber + "E" + episodeNumber)
-        
-        if (response && response.still_path) {
-            const imageUrl = TMDB_IMAGE_BASE_URL + response.still_path
-            console.log("[TMDb] Got image:", imageUrl.substring(0, 60))
-            return imageUrl
-        } else {
-            console.log("[TMDb] No still_path found")
-        }
-    } catch (error) {
-        console.error("[TMDb] Error fetching episode:", error)
     }
     
     return null
