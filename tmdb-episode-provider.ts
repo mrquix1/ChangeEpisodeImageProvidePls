@@ -5,12 +5,7 @@
 
 function init() {
     $app.onAnimeEpisodeMetadata((e) => {
-        if (!e.animeEpisodeMetadata?.image) {
-            e.next()
-            return
-        }
-        
-        if (e.animeEpisodeMetadata.image.indexOf("thetvdb") === -1) {
+        if (!e.animeEpisodeMetadata?.image?.includes("thetvdb")) {
             e.next()
             return
         }
@@ -25,25 +20,24 @@ function init() {
             const findUrl = baseUrl + "/find/" + e.mediaId + "?api_key=" + apiKey + "&external_source=anilist_id"
             const findResp = fetch(findUrl)
             
-            if (!findResp || !findResp.tv_results || findResp.tv_results.length === 0) {
-                console.log("[TMDb] No TMDb match")
+            if (!findResp?.tv_results?.[0]) {
                 e.next()
                 return
             }
             
             const tmdbId = findResp.tv_results[0].id
-            console.log("[TMDb] TMDb ID:", tmdbId)
             
-            const epUrl = baseUrl + "/tv/" + tmdbId + "/season/3/episode/" + e.episodeNumber + "?api_key=" + apiKey
-            const epResp = fetch(epUrl)
-            
-            if (epResp && epResp.still_path) {
-                const newImage = imageUrl + epResp.still_path
-                e.animeEpisodeMetadata.image = newImage
-                e.animeEpisodeMetadata.hasImage = true
-                console.log("[TMDb] REPLACED episode", e.episodeNumber)
-            } else {
-                console.log("[TMDb] No still_path for episode", e.episodeNumber)
+            // Try seasons 1-5
+            for (let season = 1; season <= 5; season++) {
+                const epUrl = baseUrl + "/tv/" + tmdbId + "/season/" + season + "/episode/" + e.episodeNumber + "?api_key=" + apiKey
+                const epResp = fetch(epUrl)
+                
+                if (epResp?.still_path) {
+                    e.animeEpisodeMetadata.image = imageUrl + epResp.still_path
+                    e.animeEpisodeMetadata.hasImage = true
+                    console.log("[TMDb] REPLACED")
+                    break
+                }
             }
         } catch (err) {
             console.error("[TMDb] Error:", err)
