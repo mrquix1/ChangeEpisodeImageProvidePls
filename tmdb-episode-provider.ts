@@ -9,77 +9,42 @@ const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
 
 function init() {
     $app.onAnimeEpisodeMetadata((e) => {
-        console.log("[TMDb] Episode", e.episodeNumber)
-        
-        if (!e.animeEpisodeMetadata || !e.animeEpisodeMetadata.image) {
+        if (!e.animeEpisodeMetadata?.image?.includes("thetvdb")) {
             e.next()
             return
         }
         
-        const currentImage = e.animeEpisodeMetadata.image
+        console.log("[TMDb] Processing episode", e.episodeNumber, "mediaId", e.mediaId)
         
-        if (currentImage.indexOf("thetvdb") === -1) {
-            e.next()
-            return
-        }
-        
-        console.log("[TMDb] TheTVDB found, getting TMDb ID...")
-        
-        const tmdbId = getTmdbIdFromAnilist(e.mediaId)
-        console.log("[TMDb] TMDb ID:", tmdbId)
-        
-        if (!tmdbId) {
-            e.next()
-            return
-        }
-        
-        // Try seasons 1-5
-        let found = false
-        for (let season = 1; season <= 5 && !found; season++) {
-            console.log("[TMDb] Trying season", season)
+        try {
+            // Get TMDb ID
+            const findUrl = TMDB_BASE_URL + "/find/" + e.mediaId + "?api_key=" + TMDB_API_KEY + "&external_source=anilist_id"
+            const findResp = fetch(findUrl)
             
-            try {
-                const url = TMDB_BASE_URL + "/tv/" + tmdbId + "/season/" + season + "/episode/" + e.episodeNumber + "?api_key=" + TMDB_API_KEY
-                console.log("[TMDb] URL:", url.substring(0, 80))
-                
-                const response = fetch(url)
-                console.log("[TMDb] Response:", response ? "got response" : "null")
-                
-                if (response) {
-                    console.log("[TMDb] Response keys:", Object.keys(response))
-                    
-                    if (response.still_path) {
-                        const newImage = TMDB_IMAGE_BASE_URL + response.still_path
-                        e.animeEpisodeMetadata.image = newImage
-                        e.animeEpisodeMetadata.hasImage = true
-                        console.log("[TMDb] REPLACED with:", newImage.substring(0, 60))
-                        found = true
-                    }
-                }
-            } catch (err) {
-                console.error("[TMDb] Season", season, "error:", err)
+            if (!findResp?.tv_results?.[0]) {
+                console.log("[TMDb] No TMDb match")
+                e.next()
+                return
             }
-        }
-        
-        if (!found) {
-            console.log("[TMDb] No TMDb image found for episode", e.episodeNumber)
+            
+            const tmdbId = findResp.tv_results[0].id
+            console.log("[TMDb] Found TMDb ID:", tmdbId)
+            
+            // Try to get episode from season 3 (since this is My Hero Academia S3)
+            const epUrl = TMDB_BASE_URL + "/tv/" + tmdbId + "/season/3/episode/" + e.episodeNumber + "?api_key=" + TMDB_API_KEY
+            const epResp = fetch(epUrl)
+            
+            if (epResp?.still_path) {
+                const newUrl = TMDB_IMAGE_BASE_URL + epResp.still_path
+                e.animeEpisodeMetadata.image = newUrl
+                console.log("[TMDb] REPLACED episode", e.episodeNumber)
+            } else {
+                console.log("[TMDb] No still_path in response for episode", e.episodeNumber)
+            }
+        } catch (err) {
+            console.error("[TMDb] Error:", err)
         }
         
         e.next()
     })
-}
-
-function getTmdbIdFromAnilist(anilistId) {
-    try {
-        const url = TMDB_BASE_URL + "/find/" + anilistId + "?api_key=" + TMDB_API_KEY + "&external_source=anilist_id"
-        const response = fetch(url)
-        
-        if (response && response.tv_results && response.tv_results.length > 0) {
-            return response.tv_results[0].id
-        }
-    } catch (error) {
-        console.error("[TMDb] Error:", error)
-    }
-    
-    return null
 }
