@@ -12,24 +12,29 @@ function init() {
         console.log("[TMDb] Episode", e.episodeNumber, "mediaId:", e.mediaId)
         
         if (!e.animeEpisodeMetadata || !e.animeEpisodeMetadata.image) {
-            console.log("[TMDb] No image")
             e.next()
             return
         }
         
         const currentImage = e.animeEpisodeMetadata.image
-        console.log("[TMDb] Current image:", currentImage.substring(0, 60))
         
         if (currentImage.indexOf("thetvdb") !== -1) {
-            console.log("[TMDb] Found TheTVDB image")
+            console.log("[TMDb] Found TheTVDB, fetching TMDb...")
             
             const tmdbId = getTmdbIdFromAnilist(e.mediaId)
+            console.log("[TMDb] TMDb ID:", tmdbId)
+            
             if (tmdbId) {
-                const tmdbImage = getTmdbEpisodeImage(tmdbId, 1, e.episodeNumber)
-                if (tmdbImage) {
-                    e.animeEpisodeMetadata.image = tmdbImage
-                    e.animeEpisodeMetadata.hasImage = true
-                    console.log("[TMDb] REPLACED with TMDb image")
+                // Try seasons 1-5 to find the episode
+                for (let season = 1; season <= 5; season++) {
+                    const tmdbImage = getTmdbEpisodeImage(tmdbId, season, e.episodeNumber)
+                    if (tmdbImage) {
+                        console.log("[TMDb] Found image in season", season)
+                        e.animeEpisodeMetadata.image = tmdbImage
+                        e.animeEpisodeMetadata.hasImage = true
+                        console.log("[TMDb] REPLACED!")
+                        break
+                    }
                 }
             }
         }
@@ -62,7 +67,7 @@ function getTmdbEpisodeImage(tmdbId, seasonNumber, episodeNumber) {
             return TMDB_IMAGE_BASE_URL + response.still_path
         }
     } catch (error) {
-        console.error("[TMDb] Error:", error)
+        // Silent
     }
     
     return null
