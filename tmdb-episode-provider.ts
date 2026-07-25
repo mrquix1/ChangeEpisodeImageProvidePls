@@ -19,7 +19,7 @@ function init() {
         
         const tmdbId = getTmdbIdFromAnilist(e.mediaId)
         if (!tmdbId) {
-            console.log("[TMDb] No TMDb ID found")
+            console.log("[TMDb] No TMDb ID")
             e.next()
             return
         }
@@ -32,11 +32,15 @@ function init() {
             if (!episode.image) continue
             
             if (episode.image.indexOf("thetvdb") !== -1) {
-                const tmdbImage = getTmdbEpisodeImage(tmdbId, parseInt(key.substring(1)))
+                // Episode key format: "e1", "e2", etc
+                const episodeNum = parseInt(key.substring(1))
+                console.log("[TMDb] Processing episode", episodeNum)
+                
+                const tmdbImage = getTmdbEpisodeImage(tmdbId, 1, episodeNum)
                 if (tmdbImage) {
                     episode.image = tmdbImage
                     replaced++
-                    console.log("[TMDb] Replaced episode", key)
+                    console.log("[TMDb] Replaced episode", key, "with:", tmdbImage.substring(0, 60))
                 }
             }
         }
@@ -55,22 +59,28 @@ function getTmdbIdFromAnilist(anilistId) {
             return response.tv_results[0].id
         }
     } catch (error) {
-        console.error("[TMDb] Error finding TMDb ID:", error)
+        console.error("[TMDb] Error:", error)
     }
     
     return null
 }
 
-function getTmdbEpisodeImage(tmdbId, episodeNumber) {
+function getTmdbEpisodeImage(tmdbId, seasonNumber, episodeNumber) {
     try {
-        const url = TMDB_BASE_URL + "/tv/" + tmdbId + "/season/1/episode/" + episodeNumber + "?api_key=" + TMDB_API_KEY
+        const url = TMDB_BASE_URL + "/tv/" + tmdbId + "/season/" + seasonNumber + "/episode/" + episodeNumber + "?api_key=" + TMDB_API_KEY
         const response = fetch(url)
         
+        console.log("[TMDb] Fetching S" + seasonNumber + "E" + episodeNumber)
+        
         if (response && response.still_path) {
-            return TMDB_IMAGE_BASE_URL + response.still_path
+            const imageUrl = TMDB_IMAGE_BASE_URL + response.still_path
+            console.log("[TMDb] Got image:", imageUrl.substring(0, 60))
+            return imageUrl
+        } else {
+            console.log("[TMDb] No still_path found")
         }
     } catch (error) {
-        console.error("[TMDb] Error getting episode image:", error)
+        console.error("[TMDb] Error fetching episode:", error)
     }
     
     return null
