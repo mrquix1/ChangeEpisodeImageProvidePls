@@ -56,6 +56,11 @@ function init() {
         const currentMediaId = ctx.state<number | null>(null)
 
         ctx.screen.onNavigate((ev) => {
+            // TEMP DIAGNOSTIC: log every navigation event, unfiltered,
+            // so we can confirm this hook fires at all before trusting
+            // anything downstream.
+            console.log("[TMDb] onNavigate fired. pathname:", ev.pathname, "searchParams:", JSON.stringify(ev.searchParams))
+
             if (ev.pathname === "/entry" && ev.searchParams.id) {
                 currentMediaId.set(Number(ev.searchParams.id))
             } else {
