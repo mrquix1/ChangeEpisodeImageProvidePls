@@ -17,36 +17,20 @@ function init() {
             console.log("[TMDb] Fetching for mediaId:", data.mediaId)
             
             try {
-                const findResp = ctx.fetch("https://api.themoviedb.org/3/find/" + data.mediaId + "?api_key=1a1c34ba2f8d63191cd5b163d74d1c52&external_source=anilist_id")
+                const findUrl = "https://api.themoviedb.org/3/find/" + data.mediaId + "?api_key=1a1c34ba2f8d63191cd5b163d74d1c52&external_source=anilist_id"
+                console.log("[TMDb] URL:", findUrl.substring(0, 80))
+                
+                const findResp = ctx.fetch(findUrl)
+                console.log("[TMDb] Response type:", typeof findResp)
+                console.log("[TMDb] Response keys:", findResp ? Object.keys(findResp) : "null")
+                console.log("[TMDb] tv_results:", findResp?.tv_results)
                 
                 if (!findResp?.tv_results?.[0]) {
-                    console.log("[TMDb] No match")
+                    console.log("[TMDb] No match - tv_results is:", findResp?.tv_results)
                     return
                 }
                 
-                const tmdbId = findResp.tv_results[0].id
-                console.log("[TMDb] TMDb ID:", tmdbId)
-                
-                const showResp = ctx.fetch("https://api.themoviedb.org/3/tv/" + tmdbId + "?api_key=1a1c34ba2f8d63191cd5b163d74d1c52")
-                
-                if (!showResp?.seasons) return
-                
-                for (let s = 0; s < showResp.seasons.length; s++) {
-                    const seasonNum = showResp.seasons[s].season_number
-                    const seasonResp = ctx.fetch("https://api.themoviedb.org/3/tv/" + tmdbId + "/season/" + seasonNum + "?api_key=1a1c34ba2f8d63191cd5b163d74d1c52")
-                    
-                    if (!seasonResp?.episodes) continue
-                    
-                    for (let ep = 0; ep < seasonResp.episodes.length; ep++) {
-                        const episode = seasonResp.episodes[ep]
-                        if (data.animeMetadata.episodes["e" + episode.episode_number] && episode.still_path) {
-                            data.animeMetadata.episodes["e" + episode.episode_number].image = "https://image.tmdb.org/t/p/original" + episode.still_path
-                            console.log("[TMDb] REPLACED episode", episode.episode_number)
-                        }
-                    }
-                }
-                
-                console.log("[TMDb] Done")
+                console.log("[TMDb] FOUND TMDb ID")
             } catch (err) {
                 console.error("[TMDb] Error:", err)
             }
