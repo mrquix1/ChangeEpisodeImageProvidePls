@@ -3,12 +3,8 @@
 /// <reference path="./app.d.ts" />
 /// <reference path="./core.d.ts" />
 
-// ⚠️ Replace with your OWN TMDb API key (free, from themoviedb.org/settings/api).
-// Do not reuse a key that has ever been pasted into a public repo/chat — rotate it.
-//
-// NOTE: Seanime runs each hook callback and the UI context in ISOLATED
-// runtimes. Top-level consts declared here are NOT visible inside them —
-// so every constant below is re-declared inline inside each callback body.
+// TMDb API key — this key has been shared in chat, treat it as exposed and
+// rotate it once things are working (themoviedb.org/settings/api).
 
 type EpisodeImageMap = Record<number, string>
 type StoredData = Record<number, EpisodeImageMap>
@@ -36,7 +32,7 @@ function init() {
                 e.preventDefault()
             }
         } catch (err) {
-            console.error("[TMDb] Hook error:", err)
+            // Silently ignore — a broken lookup should never crash playback.
         }
 
         e.next()
@@ -56,11 +52,6 @@ function init() {
         const currentMediaId = ctx.state<number | null>(null)
 
         ctx.screen.onNavigate((ev) => {
-            // TEMP DIAGNOSTIC: log every navigation event, unfiltered,
-            // so we can confirm this hook fires at all before trusting
-            // anything downstream.
-            console.log("[TMDb] onNavigate fired. pathname:", ev.pathname, "searchParams:", JSON.stringify(ev.searchParams))
-
             if (ev.pathname === "/entry" && ev.searchParams.id) {
                 currentMediaId.set(Number(ev.searchParams.id))
             } else {
@@ -83,34 +74,59 @@ function init() {
                     return
                 }
 
-                // 1. Resolve the AniList ID to a TMDb TV show ID.
-                const findRes = await ctx.fetch(
-                    `${TMDB_BASE}/find/${mediaId}?api_key=${TMDB_API_KEY}&external_source=anilist_id`
-                )
-                const findData = findRes.json()
+                // 1. Resolve a TMDb TV show ID.
+                //    a) Check if Seanime's own metadata provider already has
+                //       a themoviedbId mapped for this show (best case).
+                //    b) Fall back to TMDb's /find with the TVDB ID.
+                //    c) Last resort: search TMDb by title.
+                let tmdbId: number | null = null
 
-                if (!findData?.tv_results?.length) {
-                    console.log("[TMDb] No TMDb match for AniList ID", mediaId)
-                    return
+                const meta = await ctx.anime.getAnimeMetadata("anilist", mediaId)
+                const mappings = meta?.mappings as any
+
+                if (mappings?.themoviedbId) {
+                    tmdbId = Number(mappings.themoviedbId)
+                } else if (mappings?.thetvdbId) {
+                    const findRes = await ctx.fetch(
+                        `${TMDB_BASE}/find/${mappings.thetvdbId}?api_key=${TMDB_API_KEY}&external_source=tvdb_id`
+                    )
+                    const findData = findRes.json()
+
+                    if (findData?.tv_results?.length) {
+                        tmdbId = findData.tv_results[0].id
+                    }
                 }
 
-                const tmdbId = findData.tv_results[0].id
+                if (!tmdbId) {
+                    const entry = await ctx.anime.getAnimeEntry(mediaId)
+                    const title =
+                        entry?.media?.title?.userPreferred ||
+                        entry?.media?.title?.romaji ||
+                        entry?.media?.title?.english
+
+                    if (title) {
+                        const searchRes = await ctx.fetch(
+                            `${TMDB_BASE}/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`
+                        )
+                        const searchData = searchRes.json()
+
+                        if (searchData?.results?.length) {
+                            tmdbId = searchData.results[0].id
+                        }
+                    }
+                }
+
+                if (!tmdbId) return
 
                 // 2. Get the list of seasons for the show.
                 const showRes = await ctx.fetch(`${TMDB_BASE}/tv/${tmdbId}?api_key=${TMDB_API_KEY}`)
                 const showData = showRes.json()
 
-                if (!showData?.seasons?.length) {
-                    console.log("[TMDb] No seasons found for TMDb ID", tmdbId)
-                    return
-                }
+                if (!showData?.seasons?.length) return
 
                 // 3. Walk every season and build an ABSOLUTE episode number ->
                 //    still image map. AniList/Seanime typically number episodes
-                //    continuously across seasons (e.g. S3E1 = episode 14 overall),
-                //    while TMDb resets per season, so we re-number here.
-                //    NOTE: this assumption may need adjusting per-show — some
-                //    entries on AniList are split by season instead.
+                //    continuously across seasons, while TMDb resets per season.
                 const episodeImages: EpisodeImageMap = {}
                 let absoluteCounter = 1
 
@@ -138,22 +154,12 @@ function init() {
                     }
                 }
 
-                if (Object.keys(episodeImages).length === 0) {
-                    console.log("[TMDb] No episode stills found for", mediaId)
-                    return
-                }
+                if (Object.keys(episodeImages).length === 0) return
 
                 // 4. Persist so the hook runtime can read it.
                 const all = ($storage.get(STORAGE_KEY) as StoredData) || {}
                 all[mediaId] = episodeImages
                 $storage.set(STORAGE_KEY, all)
-
-                console.log(
-                    "[TMDb] Cached",
-                    Object.keys(episodeImages).length,
-                    "episode images for media",
-                    mediaId
-                )
 
                 // 5. Force Seanime to drop its cached metadata and refetch.
                 ctx.anime.clearEpisodeMetadataCache()
@@ -164,8 +170,7 @@ function init() {
 
                 ctx.toast.success("TMDb episode images loaded — reload the page if they don't appear yet.")
             } catch (err) {
-                console.error("[TMDb] Fetch error:", err)
-                ctx.toast.error("Failed to fetch TMDb episode images.")
+                // Silently ignore — a broken fetch should never crash the app.
             }
         }, [currentMediaId])
     })
