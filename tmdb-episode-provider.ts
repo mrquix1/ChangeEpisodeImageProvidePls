@@ -5,10 +5,10 @@
 
 // ⚠️ Replace with your OWN TMDb API key (free, from themoviedb.org/settings/api).
 // Do not reuse a key that has ever been pasted into a public repo/chat — rotate it.
-const TMDB_API_KEY = "1a1c34ba2f8d63191cd5b163d74d1c52"
-const TMDB_BASE = "https://api.themoviedb.org/3"
-const TMDB_IMG = "https://image.tmdb.org/t/p/original"
-const STORAGE_KEY = "TMDB_EPISODE_IMAGES"
+//
+// NOTE: Seanime runs each hook callback and the UI context in ISOLATED
+// runtimes. Top-level consts declared here are NOT visible inside them —
+// so every constant below is re-declared inline inside each callback body.
 
 type EpisodeImageMap = Record<number, string>
 type StoredData = Record<number, EpisodeImageMap>
@@ -18,6 +18,8 @@ function init() {
     // This is the *preventable* variant: we can call preventDefault() and
     // return our own overridden episode metadata instead of just observing it.
     $app.onAnimeEpisodeMetadataRequested((e) => {
+        const STORAGE_KEY = "TMDB_EPISODE_IMAGES"
+
         try {
             const stored = ($storage.get(STORAGE_KEY) as StoredData) || {}
             const forAnime = stored[e.mediaId]
@@ -43,6 +45,14 @@ function init() {
     // ---- UI RUNTIME ----
     // All network requests happen here. Hooks cannot make HTTP requests.
     $ui.register((ctx) => {
+        // Declared inside this runtime's own closure — safe to reuse in
+        // ctx.effect() below since that's a nested closure, not a
+        // separately-isolated runtime.
+        const TMDB_API_KEY = "1a1c34ba2f8d63191cd5b163d74d1c52"
+        const TMDB_BASE = "https://api.themoviedb.org/3"
+        const TMDB_IMG = "https://image.tmdb.org/t/p/original"
+        const STORAGE_KEY = "TMDB_EPISODE_IMAGES"
+
         const currentMediaId = ctx.state<number | null>(null)
 
         ctx.screen.onNavigate((ev) => {
