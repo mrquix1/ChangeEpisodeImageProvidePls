@@ -13,7 +13,7 @@ function init() {
     $ui.register((ctx) => {
         console.log("[TMDb] UI registered")
         
-        ctx.store.watch("TMDB_ANIME_METADATA", (data) => {
+        $store.watch("TMDB_ANIME_METADATA", (data) => {
             console.log("[TMDb] Fetching for mediaId:", data.mediaId)
             
             try {
