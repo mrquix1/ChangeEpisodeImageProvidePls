@@ -1,0 +1,43 @@
+{
+    "id": "tmdb-episode-provider",
+    "name": "TMDb Episode Provider",
+    "version": "1.0.0",
+    "description": "Automatically replaces low-quality TheTVDB episode images with higher quality versions from TMDb",
+    "author": "mrquix1",
+    "type": "plugin",
+    "language": "typescript",
+    "lang": "en",
+    "manifestURI": "https://raw.githubusercontent.com/mrquix1/ChangeEpisodeImageProvidePls/main/tmdb-episode-provider.json",
+    "payloadURI": "https://raw.githubusercontent.com/mrquix1/ChangeEpisodeImageProvidePls/main/tmdb-episode-provider.ts",
+    "icon": "https://www.themoviedb.org/assets/2/favicon-32x32.png",
+    "website": "https://github.com/mrquix1/ChangeEpisodeImageProvidePls",
+    "readme": "https://github.com/mrquix1/ChangeEpisodeImageProvidePls#readme",
+    "notes": "Replace {{apiKey}} with your TMDb API key in the code, or use the user config feature",
+    "plugin": {
+        "version": "1",
+        "permissions": {
+            "scopes": [],
+            "allow": {
+                "networkAccess": {
+                    "allowedDomains": [
+                        "api.themoviedb.org",
+                        "image.tmdb.org"
+                    ],
+                    "reasoning": "Required to fetch anime data and episode images from TMDb API and serve the images"
+                }
+            }
+        }
+    },
+    "userConfig": {
+        "requiresConfig": true,
+        "version": 1,
+        "fields": [
+            {
+                "name": "apiKey",
+                "label": "TMDb API Key",
+                "type": "text",
+                "default": ""
+            }
+        ]
+    }
+}
