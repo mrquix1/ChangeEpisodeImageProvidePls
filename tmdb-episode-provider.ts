@@ -79,7 +79,7 @@ function init() {
     })
 
     // Hook into anime details request to replace episode images
-    $app.onAnimeDetailsRequested((e) => {
+    $app.onGetAnimeDetails((e) => {
         if (!e.anime || !e.anime.episodes) {
             e.next()
             return
