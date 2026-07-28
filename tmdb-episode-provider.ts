@@ -11,72 +11,7 @@ function init() {
     // Cache for episode images to avoid repeated API calls
     const imageCache = new Map<number, Map<string, string>>()
 
-    // Register hook - fires when anime metadata is being processed
-    $app.onAnimeMetadata((e) => {
-        console.log("[TMDb Provider] Hook fired - onAnimeMetadata")
-        console.log("[TMDb Provider] Media ID:", e.mediaId)
-
-        if (!e.animeMetadata) {
-            console.log("[TMDb Provider] No anime metadata")
-            e.next()
-            return
-        }
-
-        if (!e.animeMetadata.episodes) {
-            console.log("[TMDb Provider] No episodes in metadata")
-            e.next()
-            return
-        }
-
-        console.log(`[TMDb Provider] Processing metadata for media ID: ${e.mediaId}`)
-
-        // Run async replacement
-        ;(async () => {
-            try {
-                await replaceMetadataEpisodeImages(e.mediaId, e.animeMetadata)
-            } catch (error) {
-                console.error("[TMDb Provider] Replacement error:", error)
-            }
-        })()
-
-        e.next()
-    })
-
-    // MUST register UI context - this is mandatory for plugins
-    $ui.register((ctx) => {
-        console.log("[TMDb Provider] ✅ UI context registered")
-
-        // Create tray
-        const tray = ctx.newTray({
-            tooltipText: "TMDb Episode Provider",
-            withContent: true,
-        })
-
-        const status = ctx.state("Ready")
-        const lastAnime = ctx.state("None")
-
-        tray.render(() => {
-            return tray.stack([
-                tray.text("TMDb Episode Provider", { className: "font-bold" }),
-                tray.text(`Status: ${status.get()}`, { className: "text-sm" }),
-                tray.text(`Last: ${lastAnime.get()}`, { className: "text-xs" }),
-                tray.button("Clear Cache", {
-                    size: "sm",
-                    onClick: ctx.eventHandler("clear-cache", () => {
-                        imageCache.clear()
-                        status.set("Cache Cleared")
-                        ctx.toast.success("Image cache cleared!")
-                        ctx.setTimeout(() => {
-                            status.set("Ready")
-                        }, 2000)
-                    }),
-                }),
-            ])
-        })
-
-        console.log("[TMDb Provider] ✅ Plugin fully loaded!")
-    })
-
+    // Define all helper functions FIRST
     async function replaceMetadataEpisodeImages(mediaId: number, animeMetadata: any) {
         try {
             console.log(`[TMDb Provider] Replacing images for media ${mediaId}`)
@@ -238,4 +173,70 @@ function init() {
 
         return episodes
     }
+
+    // Register hook - fires when anime metadata is being processed
+    $app.onAnimeMetadata((e) => {
+        console.log("[TMDb Provider] Hook fired - onAnimeMetadata")
+        console.log("[TMDb Provider] Media ID:", e.mediaId)
+
+        if (!e.animeMetadata) {
+            console.log("[TMDb Provider] No anime metadata")
+            e.next()
+            return
+        }
+
+        if (!e.animeMetadata.episodes) {
+            console.log("[TMDb Provider] No episodes in metadata")
+            e.next()
+            return
+        }
+
+        console.log(`[TMDb Provider] Processing metadata for media ID: ${e.mediaId}`)
+
+        // Run async replacement
+        ;(async () => {
+            try {
+                await replaceMetadataEpisodeImages(e.mediaId, e.animeMetadata)
+            } catch (error) {
+                console.error("[TMDb Provider] Replacement error:", error)
+            }
+        })()
+
+        e.next()
+    })
+
+    // MUST register UI context - this is mandatory for plugins
+    $ui.register((ctx) => {
+        console.log("[TMDb Provider] ✅ UI context registered")
+
+        // Create tray
+        const tray = ctx.newTray({
+            tooltipText: "TMDb Episode Provider",
+            withContent: true,
+        })
+
+        const status = ctx.state("Ready")
+        const lastAnime = ctx.state("None")
+
+        tray.render(() => {
+            return tray.stack([
+                tray.text("TMDb Episode Provider", { className: "font-bold" }),
+                tray.text(`Status: ${status.get()}`, { className: "text-sm" }),
+                tray.text(`Last: ${lastAnime.get()}`, { className: "text-xs" }),
+                tray.button("Clear Cache", {
+                    size: "sm",
+                    onClick: ctx.eventHandler("clear-cache", () => {
+                        imageCache.clear()
+                        status.set("Cache Cleared")
+                        ctx.toast.success("Image cache cleared!")
+                        ctx.setTimeout(() => {
+                            status.set("Ready")
+                        }, 2000)
+                    }),
+                }),
+            ])
+        })
+
+        console.log("[TMDb Provider] ✅ Plugin fully loaded!")
+    })
 }
