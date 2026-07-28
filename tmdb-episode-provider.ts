@@ -8,9 +8,9 @@ const TMDB_API_BASE = "https://api.themoviedb.org/3"
 function init() {
     console.log("[TMDb Provider] ✅ Plugin init started")
 
-    // Register hook FIRST
-    $app.onGetAnimeDetails((e) => {
-        console.log("[TMDb Provider] Hook fired")
+    // Register hook - fires when anime library data is requested
+    $app.onAnimeEntryLibraryDataRequested((e) => {
+        console.log("[TMDb Provider] Hook fired - onAnimeEntryLibraryDataRequested")
         console.log("[TMDb Provider] Anime object:", e.anime)
         
         if (!e.anime) {
