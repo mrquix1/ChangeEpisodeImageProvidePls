@@ -8,29 +8,32 @@ const TMDB_API_BASE = "https://api.themoviedb.org/3"
 function init() {
     console.log("[TMDb Provider] ✅ Plugin init started")
 
-    // Register hook - fires when anime library data is requested
-    $app.onAnimeEntryLibraryDataRequested((e) => {
-        console.log("[TMDb Provider] Hook fired - onAnimeEntryLibraryDataRequested")
-        console.log("[TMDb Provider] Anime object:", e.anime)
-        
-        if (!e.anime) {
-            console.log("[TMDb Provider] No anime object")
+    // Cache for episode images to avoid repeated API calls
+    const imageCache = new Map<number, Map<string, string>>()
+
+    // Register hook - fires when anime metadata is being processed
+    $app.onAnimeMetadata((e) => {
+        console.log("[TMDb Provider] Hook fired - onAnimeMetadata")
+        console.log("[TMDb Provider] Media ID:", e.mediaId)
+
+        if (!e.animeMetadata) {
+            console.log("[TMDb Provider] No anime metadata")
             e.next()
             return
         }
 
-        if (!e.anime.episodes || e.anime.episodes.length === 0) {
-            console.log("[TMDb Provider] No episodes")
+        if (!e.animeMetadata.episodes) {
+            console.log("[TMDb Provider] No episodes in metadata")
             e.next()
             return
         }
 
-        console.log(`[TMDb Provider] Processing anime ID: ${e.anime.id} with ${e.anime.episodes.length} episodes`)
+        console.log(`[TMDb Provider] Processing metadata for media ID: ${e.mediaId}`)
 
         // Run async replacement
         ;(async () => {
             try {
-                await replaceEpisodeImages(e.anime)
+                await replaceMetadataEpisodeImages(e.mediaId, e.animeMetadata)
             } catch (error) {
                 console.error("[TMDb Provider] Replacement error:", error)
             }
@@ -57,12 +60,15 @@ function init() {
                 tray.text("TMDb Episode Provider", { className: "font-bold" }),
                 tray.text(`Status: ${status.get()}`, { className: "text-sm" }),
                 tray.text(`Last: ${lastAnime.get()}`, { className: "text-xs" }),
-                tray.button("Test", {
+                tray.button("Clear Cache", {
                     size: "sm",
-                    onClick: ctx.eventHandler("test", () => {
-                        status.set("Testing...")
-                        ctx.toast.success("Plugin is working!")
-                        status.set("Ready")
+                    onClick: ctx.eventHandler("clear-cache", () => {
+                        imageCache.clear()
+                        status.set("Cache Cleared")
+                        ctx.toast.success("Image cache cleared!")
+                        ctx.setTimeout(() => {
+                            status.set("Ready")
+                        }, 2000)
                     }),
                 }),
             ])
@@ -71,82 +77,75 @@ function init() {
         console.log("[TMDb Provider] ✅ Plugin fully loaded!")
     })
 
-    async function replaceEpisodeImages(anime: any) {
+    async function replaceMetadataEpisodeImages(mediaId: number, animeMetadata: any) {
         try {
-            const animeTitle = getAnimeTitle(anime)
-            console.log(`[TMDb Provider] Processing: ${animeTitle}`)
+            console.log(`[TMDb Provider] Replacing images for media ${mediaId}`)
 
-            if (!anime.episodes || anime.episodes.length === 0) {
-                console.log("[TMDb Provider] No episodes to process")
-                return
+            // Check if we have cached data for this media
+            let episodeMap = imageCache.get(mediaId)
+
+            if (!episodeMap) {
+                console.log(`[TMDb Provider] No cache found, fetching from TMDb...`)
+
+                // Search for anime on TMDb
+                const tmdbId = await searchTmdbAnimeByMediaId(mediaId, animeMetadata)
+
+                if (!tmdbId) {
+                    console.warn(`[TMDb Provider] No TMDb match found for media ${mediaId}`)
+                    return
+                }
+
+                console.log(`[TMDb Provider] Found TMDb ID: ${tmdbId}`)
+
+                // Fetch all episodes
+                episodeMap = await getEpisodeImages(tmdbId)
+
+                if (episodeMap.size === 0) {
+                    console.warn(`[TMDb Provider] No episode images found on TMDb`)
+                    return
+                }
+
+                // Cache the results
+                imageCache.set(mediaId, episodeMap)
+                console.log(`[TMDb Provider] Cached ${episodeMap.size} episode images`)
+            } else {
+                console.log(`[TMDb Provider] Using cached data`)
             }
 
-            // Search TMDb
-            const tmdbId = await searchTmdbAnime(anime)
-            if (!tmdbId) {
-                console.warn(`[TMDb Provider] No TMDb match found for ${animeTitle}`)
-                return
-            }
-
-            console.log(`[TMDb Provider] Found TMDb ID: ${tmdbId}`)
-
-            // Get episodes
-            const episodeMap = await getEpisodeImages(tmdbId)
-
-            if (episodeMap.size === 0) {
-                console.warn(`[TMDb Provider] No episode images found`)
-                return
-            }
-
-            // Replace images
+            // Replace episode images in metadata
             let replaced = 0
-            for (const ep of anime.episodes) {
-                if (ep && ep.seasonNumber !== undefined && ep.episodeNumber !== undefined) {
-                    const key = `${ep.seasonNumber}-${ep.episodeNumber}`
-                    const imageUrl = episodeMap.get(key)
-
-                    if (imageUrl && ep.image) {
-                        console.log(`[TMDb Provider] Replacing S${ep.seasonNumber}E${ep.episodeNumber}`)
-                        ep.image = imageUrl
-                        replaced++
-                    }
+            for (const [key, imageUrl] of episodeMap.entries()) {
+                if (animeMetadata.episodes[key]) {
+                    console.log(`[TMDb Provider] Replacing image for episode ${key}`)
+                    animeMetadata.episodes[key].image = imageUrl
+                    animeMetadata.episodes[key].hasImage = true
+                    replaced++
                 }
             }
 
-            console.log(`[TMDb Provider] ✅ Replaced ${replaced}/${anime.episodes.length} images`)
+            console.log(`[TMDb Provider] ✅ Replaced ${replaced} episode images`)
         } catch (error) {
             console.error(`[TMDb Provider] Error:`, error)
         }
     }
 
-    function getAnimeTitle(anime: any): string {
-        if (!anime) return "Unknown"
-        if (anime.title) {
-            if (typeof anime.title === "string") return anime.title
-            if (anime.title.english) return anime.title.english
-            if (anime.title.romaji) return anime.title.romaji
-        }
-        if (anime.englishTitle) return anime.englishTitle
-        if (anime.romajiTitle) return anime.romajiTitle
-        return `ID: ${anime.id}`
-    }
-
-    async function searchTmdbAnime(anime: any): Promise<number | null> {
+    async function searchTmdbAnimeByMediaId(mediaId: number, animeMetadata: any): Promise<number | null> {
         const queries: string[] = []
 
-        // Build search queries
-        if (anime.title) {
-            if (typeof anime.title === "string") {
-                queries.push(anime.title)
+        // Build search queries from metadata
+        if (animeMetadata.title) {
+            if (typeof animeMetadata.title === "string") {
+                queries.push(animeMetadata.title)
             } else {
-                if (anime.title.english) queries.push(anime.title.english)
-                if (anime.title.romaji) queries.push(anime.title.romaji)
+                if (animeMetadata.title.english) queries.push(animeMetadata.title.english)
+                if (animeMetadata.title.romaji) queries.push(animeMetadata.title.romaji)
+                if (animeMetadata.title.userPreferred) queries.push(animeMetadata.title.userPreferred)
             }
         }
-        if (anime.englishTitle) queries.push(anime.englishTitle)
-        if (anime.romajiTitle) queries.push(anime.romajiTitle)
-        if (anime.synonyms) {
-            queries.push(...anime.synonyms.slice(0, 2))
+        if (animeMetadata.englishTitle) queries.push(animeMetadata.englishTitle)
+        if (animeMetadata.romajiTitle) queries.push(animeMetadata.romajiTitle)
+        if (animeMetadata.synonyms && Array.isArray(animeMetadata.synonyms)) {
+            queries.push(...animeMetadata.synonyms.slice(0, 2))
         }
 
         const uniqueQueries = Array.from(new Set(queries)).filter(Boolean)
@@ -164,7 +163,7 @@ function init() {
                 }
 
                 const data = await res.json() as any
-                console.log(`[TMDb Provider] Search results for "${query}":`, data.results?.length)
+                console.log(`[TMDb Provider] Search results for "${query}": ${data.results?.length || 0}`)
 
                 if (data.results && data.results.length > 0) {
                     const result = data.results[0]
@@ -184,7 +183,7 @@ function init() {
 
         try {
             console.log(`[TMDb Provider] Fetching show ${tmdbId}...`)
-            
+
             // Get show info
             const showRes = await fetch(
                 `${TMDB_API_BASE}/tv/${tmdbId}?api_key=${TMDB_API_KEY}`
@@ -203,7 +202,7 @@ function init() {
             for (let season = 0; season < seasonCount; season++) {
                 try {
                     console.log(`[TMDb Provider] Fetching season ${season}...`)
-                    
+
                     const seasonRes = await fetch(
                         `${TMDB_API_BASE}/tv/${tmdbId}/season/${season}?api_key=${TMDB_API_KEY}`
                     )
@@ -219,13 +218,13 @@ function init() {
 
                     for (const ep of seasonEpisodes) {
                         if (ep.still_path) {
-                            const key = `${season}-${ep.episode_number}`
+                            const key = `${ep.episode_number}` // Main episodes: "1", "2", etc
                             const imageUrl = `https://image.tmdb.org/t/p/original${ep.still_path}`
                             episodes.set(key, imageUrl)
                         }
                     }
 
-                    // Delay to avoid rate limit
+                    // Delay to avoid rate limiting
                     await new Promise(resolve => setTimeout(resolve, 100))
                 } catch (e) {
                     console.error(`[TMDb Provider] Season ${season} error:`, e)
