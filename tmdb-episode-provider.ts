@@ -38,6 +38,7 @@ function init() {
         }
 
         console.log("[TMDb Provider] Hook fired for media " + e.mediaId)
+        console.log("[TMDb Provider] Available episode keys: " + Object.keys(e.animeMetadata.episodes).join(", "))
 
         searchTmdbAnime(e.mediaId, e.animeMetadata).then(function(data) {
             if (!data.results || !data.results[0]) {
@@ -63,12 +64,23 @@ function init() {
                         .then(function(res) { return res.json() })
                         .then(function(seasonData) {
                             const episodes = seasonData.episodes || []
+                            console.log("[TMDb Provider] Season " + season + " has " + episodes.length + " episodes")
+                            
                             for (let i = 0; i < episodes.length; i++) {
                                 const ep = episodes[i]
-                                if (ep.still_path && e.animeMetadata.episodes[ep.episode_number]) {
-                                    e.animeMetadata.episodes[ep.episode_number].image = "https://image.tmdb.org/t/p/original" + ep.still_path
-                                    e.animeMetadata.episodes[ep.episode_number].hasImage = true
-                                    console.log("[TMDb Provider] Replaced episode " + ep.episode_number)
+                                const epNum = ep.episode_number
+                                
+                                if (ep.still_path) {
+                                    // Try different key formats
+                                    const keys = [epNum, "" + epNum, "S" + epNum]
+                                    
+                                    for (let k = 0; k < keys.length; k++) {
+                                        if (e.animeMetadata.episodes[keys[k]]) {
+                                            console.log("[TMDb Provider] Matched key: " + keys[k])
+                                            e.animeMetadata.episodes[keys[k]].image = "https://image.tmdb.org/t/p/original" + ep.still_path
+                                            e.animeMetadata.episodes[keys[k]].hasImage = true
+                                        }
+                                    }
                                 }
                             }
                             loaded++
