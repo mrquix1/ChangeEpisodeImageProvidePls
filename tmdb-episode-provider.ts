@@ -3,12 +3,12 @@
 /// <reference path="./plugin.d.ts" />
 
 function init() {
-    const TMDB_API_KEY = "7b7daf721c0b4b5789d993c24402a9dc"
-    const TMDB_API_BASE = "https://api.themoviedb.org/3"
-
     console.log("[TMDb Provider] ✅ Plugin init started")
 
-    $app.onAnimeMetadata(function(e) {
+    var TMDB_API_KEY = "7b7daf721c0b4b5789d993c24402a9dc"
+    var TMDB_API_BASE = "https://api.themoviedb.org/3"
+
+    var doReplace = function(e) {
         if (!e.animeMetadata || !e.animeMetadata.episodes) {
             e.next()
             return
@@ -17,7 +17,7 @@ function init() {
         console.log("[TMDb Provider] Hook fired for media " + e.mediaId)
 
         // Get title
-        let titleToSearch = ""
+        var titleToSearch = ""
         if (e.animeMetadata.getTitle && typeof e.animeMetadata.getTitle === "function") {
             titleToSearch = e.animeMetadata.getTitle()
         } else if (e.animeMetadata.titles) {
@@ -90,7 +90,9 @@ function init() {
         }
 
         e.next()
-    })
+    }
+
+    $app.onAnimeMetadata(doReplace)
 
     $ui.register(function(ctx) {
         var tray = ctx.newTray({ tooltipText: "TMDb Episode Provider", withContent: true })
