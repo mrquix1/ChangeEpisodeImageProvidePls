@@ -16,76 +16,66 @@ function init() {
 
         console.log("[TMDb Provider] Hook fired for media " + e.mediaId)
 
-        // Use getTitle() function from metadata
+        // Get title
         let titleToSearch = ""
         if (e.animeMetadata.getTitle && typeof e.animeMetadata.getTitle === "function") {
             titleToSearch = e.animeMetadata.getTitle()
         } else if (e.animeMetadata.titles) {
-            if (typeof e.animeMetadata.titles === "object") {
-                titleToSearch = e.animeMetadata.titles.english || e.animeMetadata.titles.romaji || e.animeMetadata.titles.native
-            }
+            titleToSearch = e.animeMetadata.titles.english || e.animeMetadata.titles.romaji
         }
 
-        console.log("[TMDb Provider] Using title: " + titleToSearch)
+        // Remove "Season X" from title to search just the base name
+        titleToSearch = titleToSearch.replace(/\s+Season\s+\d+/i, "").trim()
+
+        console.log("[TMDb Provider] Searching for: " + titleToSearch)
 
         if (!titleToSearch) {
-            console.log("[TMDb Provider] No title found in metadata")
             e.next()
             return
         }
 
-        console.log("[TMDb Provider] Searching for: " + titleToSearch)
+        // Simplified direct fetch without complex promise chains
+        var searchUrl = TMDB_API_BASE + "/search/tv?api_key=" + TMDB_API_KEY + "&query=" + encodeURIComponent(titleToSearch)
+        console.log("[TMDb Provider] Fetching URL: " + searchUrl)
 
-        fetch(TMDB_API_BASE + "/search/tv?api_key=" + TMDB_API_KEY + "&query=" + encodeURIComponent(titleToSearch))
-            .then(function(res) {
-                console.log("[TMDb Provider] Search response status: " + res.status)
-                return res.json()
-            })
-            .then(function(data) {
-                console.log("[TMDb Provider] Search response received, results: " + (data.results ? data.results.length : 0))
-
-                if (!data.results || data.results.length === 0) {
-                    console.log("[TMDb Provider] No match found")
-                    e.next()
-                    return
-                }
-
-                const tmdbId = data.results[0].id
-                const tmdbName = data.results[0].name
-                console.log("[TMDb Provider] Found TMDb ID: " + tmdbId + " (" + tmdbName + ")")
-
-                // Get show info to know total seasons
-                return fetch(TMDB_API_BASE + "/tv/" + tmdbId + "?api_key=" + TMDB_API_KEY)
-                    .then(function(res) { return res.json() })
-                    .then(function(show) {
-                        const seasonCount = show.number_of_seasons || 0
-                        console.log("[TMDb Provider] Total seasons: " + seasonCount)
-
-                        // Fetch all seasons
-                        const seasonPromises = []
-                        for (let season = 1; season <= seasonCount; season++) {
-                            const promise = fetch(TMDB_API_BASE + "/tv/" + tmdbId + "/season/" + season + "?api_key=" + TMDB_API_KEY)
-                                .then(function(res) { return res.json() })
-                                .then(function(seasonData) {
-                                    console.log("[TMDb Provider] Season " + season + " fetched: " + (seasonData.episodes ? seasonData.episodes.length : 0) + " episodes")
-                                    return seasonData
-                                })
-                            seasonPromises.push(promise)
-                        }
-
-                        return Promise.all(seasonPromises).then(function(allSeasons) {
-                            let totalReplaced = 0
-
-                            for (let s = 0; s < allSeasons.length; s++) {
-                                const seasonData = allSeasons[s]
-                                const episodes = seasonData.episodes || []
-
-                                for (let i = 0; i < episodes.length; i++) {
-                                    const ep = episodes[i]
-                                    const epNum = ep.episode_number
-
+        try {
+            var searchRes = fetch(searchUrl)
+            console.log("[TMDb Provider] Fetch complete")
+            
+            if (searchRes && searchRes.ok) {
+                var searchData = searchRes.json()
+                console.log("[TMDb Provider] JSON parsed, results: " + (searchData.results ? searchData.results.length : 0))
+                
+                if (searchData.results && searchData.results.length > 0) {
+                    var tmdbId = searchData.results[0].id
+                    console.log("[TMDb Provider] Found TMDb ID: " + tmdbId)
+                    
+                    // Fetch show details
+                    var showUrl = TMDB_API_BASE + "/tv/" + tmdbId + "?api_key=" + TMDB_API_KEY
+                    var showRes = fetch(showUrl)
+                    
+                    if (showRes && showRes.ok) {
+                        var show = showRes.json()
+                        var seasonCount = show.number_of_seasons || 1
+                        console.log("[TMDb Provider] Found " + seasonCount + " seasons")
+                        
+                        // Fetch and replace all seasons
+                        var totalReplaced = 0
+                        for (var season = 1; season <= seasonCount; season++) {
+                            var seasonUrl = TMDB_API_BASE + "/tv/" + tmdbId + "/season/" + season + "?api_key=" + TMDB_API_KEY
+                            var seasonRes = fetch(seasonUrl)
+                            
+                            if (seasonRes && seasonRes.ok) {
+                                var seasonData = seasonRes.json()
+                                var episodes = seasonData.episodes || []
+                                console.log("[TMDb Provider] Season " + season + ": " + episodes.length + " episodes")
+                                
+                                for (var i = 0; i < episodes.length; i++) {
+                                    var ep = episodes[i]
+                                    var epNum = ep.episode_number
+                                    
                                     if (ep.still_path && e.animeMetadata.episodes[epNum]) {
-                                        const imageUrl = "https://image.tmdb.org/t/p/original" + ep.still_path
+                                        var imageUrl = "https://image.tmdb.org/t/p/original" + ep.still_path
                                         e.animeMetadata.episodes[epNum].image = imageUrl
                                         e.animeMetadata.episodes[epNum].hasImage = true
                                         console.log("[TMDb Provider] ✅ Replaced episode " + epNum)
@@ -93,25 +83,26 @@ function init() {
                                     }
                                 }
                             }
+                        }
+                        
+                        console.log("[TMDb Provider] ✅ Done: Replaced " + totalReplaced + " total")
+                    }
+                } else {
+                    console.log("[TMDb Provider] No results found")
+                }
+            } else {
+                console.log("[TMDb Provider] Fetch failed or not ok")
+            }
+        } catch (err) {
+            console.error("[TMDb Provider] Error: " + err)
+        }
 
-                            console.log("[TMDb Provider] ✅ Done: Replaced " + totalReplaced + " episodes total")
-                            e.next()
-                        })
-                    })
-                    .catch(function(err) {
-                        console.error("[TMDb Provider] Error fetching seasons: " + err)
-                        e.next()
-                    })
-            })
-            .catch(function(err) {
-                console.error("[TMDb Provider] Search error: " + err)
-                e.next()
-            })
+        e.next()
     })
 
     $ui.register(function(ctx) {
-        const tray = ctx.newTray({ tooltipText: "TMDb Episode Provider", withContent: true })
-        const status = ctx.state("Ready")
+        var tray = ctx.newTray({ tooltipText: "TMDb Episode Provider", withContent: true })
+        var status = ctx.state("Ready")
 
         tray.render(function() {
             return tray.stack([
