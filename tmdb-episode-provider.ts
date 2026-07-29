@@ -15,15 +15,16 @@ function init() {
         }
 
         console.log("[TMDb Provider] Hook fired for media " + e.mediaId)
-        console.log("[TMDb Provider] Metadata keys: " + Object.keys(e.animeMetadata).join(", "))
-        console.log("[TMDb Provider] Title value: " + e.animeMetadata.title)
 
-        // Try to get title from any available property
+        // Use getTitle() function from metadata
         let titleToSearch = ""
-        if (e.animeMetadata.title) titleToSearch = e.animeMetadata.title
-        else if (e.animeMetadata.englishTitle) titleToSearch = e.animeMetadata.englishTitle
-        else if (e.animeMetadata.romajiTitle) titleToSearch = e.animeMetadata.romajiTitle
-        else if (e.animeMetadata.name) titleToSearch = e.animeMetadata.name
+        if (e.animeMetadata.getTitle && typeof e.animeMetadata.getTitle === "function") {
+            titleToSearch = e.animeMetadata.getTitle()
+        } else if (e.animeMetadata.titles) {
+            if (typeof e.animeMetadata.titles === "object") {
+                titleToSearch = e.animeMetadata.titles.english || e.animeMetadata.titles.romaji || e.animeMetadata.titles.native
+            }
+        }
 
         console.log("[TMDb Provider] Using title: " + titleToSearch)
 
