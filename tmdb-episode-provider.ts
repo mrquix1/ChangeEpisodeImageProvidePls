@@ -15,26 +15,27 @@ function init() {
         }
 
         console.log("[TMDb Provider] Hook fired for media " + e.mediaId)
+        console.log("[TMDb Provider] Metadata keys: " + Object.keys(e.animeMetadata).join(", "))
+        console.log("[TMDb Provider] Title value: " + e.animeMetadata.title)
 
-        const queries = []
-        if (e.animeMetadata.title) {
-            if (typeof e.animeMetadata.title === "string") {
-                queries.push(e.animeMetadata.title)
-            } else {
-                if (e.animeMetadata.title.english) queries.push(e.animeMetadata.title.english)
-                if (e.animeMetadata.title.romaji) queries.push(e.animeMetadata.title.romaji)
-            }
-        }
+        // Try to get title from any available property
+        let titleToSearch = ""
+        if (e.animeMetadata.title) titleToSearch = e.animeMetadata.title
+        else if (e.animeMetadata.englishTitle) titleToSearch = e.animeMetadata.englishTitle
+        else if (e.animeMetadata.romajiTitle) titleToSearch = e.animeMetadata.romajiTitle
+        else if (e.animeMetadata.name) titleToSearch = e.animeMetadata.name
 
-        console.log("[TMDb Provider] Searching for: " + queries[0])
+        console.log("[TMDb Provider] Using title: " + titleToSearch)
 
-        if (queries.length === 0 || !queries[0]) {
-            console.log("[TMDb Provider] No title to search")
+        if (!titleToSearch) {
+            console.log("[TMDb Provider] No title found in metadata")
             e.next()
             return
         }
 
-        fetch(TMDB_API_BASE + "/search/tv?api_key=" + TMDB_API_KEY + "&query=" + encodeURIComponent(queries[0]))
+        console.log("[TMDb Provider] Searching for: " + titleToSearch)
+
+        fetch(TMDB_API_BASE + "/search/tv?api_key=" + TMDB_API_KEY + "&query=" + encodeURIComponent(titleToSearch))
             .then(function(res) {
                 console.log("[TMDb Provider] Search response status: " + res.status)
                 return res.json()
