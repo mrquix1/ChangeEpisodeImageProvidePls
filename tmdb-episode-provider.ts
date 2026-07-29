@@ -2,10 +2,10 @@
 /// <reference path="./app.d.ts" />
 /// <reference path="./plugin.d.ts" />
 
-const TMDB_API_KEY = "7b7daf721c0b4b5789d993c24402a9dc"
-const TMDB_API_BASE = "https://api.themoviedb.org/3"
-
 function init() {
+    const TMDB_API_KEY = "7b7daf721c0b4b5789d993c24402a9dc"
+    const TMDB_API_BASE = "https://api.themoviedb.org/3"
+
     console.log("[TMDb Provider] ✅ Plugin init started")
 
     $app.onAnimeMetadata(function(e) {
@@ -24,7 +24,7 @@ function init() {
             titleToSearch = e.animeMetadata.titles.english || e.animeMetadata.titles.romaji
         }
 
-        // Remove "Season X" from title to search just the base name
+        // Remove "Season X" from title
         titleToSearch = titleToSearch.replace(/\s+Season\s+\d+/i, "").trim()
 
         console.log("[TMDb Provider] Searching for: " + titleToSearch)
@@ -34,41 +34,37 @@ function init() {
             return
         }
 
-        // Simplified direct fetch without complex promise chains
-        var searchUrl = TMDB_API_BASE + "/search/tv?api_key=" + TMDB_API_KEY + "&query=" + encodeURIComponent(titleToSearch)
-        console.log("[TMDb Provider] Fetching URL: " + searchUrl)
-
         try {
+            var searchUrl = TMDB_API_BASE + "/search/tv?api_key=" + TMDB_API_KEY + "&query=" + encodeURIComponent(titleToSearch)
+            console.log("[TMDb Provider] Fetching: " + searchUrl)
+
             var searchRes = fetch(searchUrl)
             console.log("[TMDb Provider] Fetch complete")
             
             if (searchRes && searchRes.ok) {
                 var searchData = searchRes.json()
-                console.log("[TMDb Provider] JSON parsed, results: " + (searchData.results ? searchData.results.length : 0))
+                console.log("[TMDb Provider] Results: " + (searchData.results ? searchData.results.length : 0))
                 
                 if (searchData.results && searchData.results.length > 0) {
                     var tmdbId = searchData.results[0].id
                     console.log("[TMDb Provider] Found TMDb ID: " + tmdbId)
                     
                     // Fetch show details
-                    var showUrl = TMDB_API_BASE + "/tv/" + tmdbId + "?api_key=" + TMDB_API_KEY
-                    var showRes = fetch(showUrl)
+                    var showRes = fetch(TMDB_API_BASE + "/tv/" + tmdbId + "?api_key=" + TMDB_API_KEY)
                     
                     if (showRes && showRes.ok) {
                         var show = showRes.json()
                         var seasonCount = show.number_of_seasons || 1
-                        console.log("[TMDb Provider] Found " + seasonCount + " seasons")
+                        console.log("[TMDb Provider] Seasons: " + seasonCount)
                         
                         // Fetch and replace all seasons
                         var totalReplaced = 0
                         for (var season = 1; season <= seasonCount; season++) {
-                            var seasonUrl = TMDB_API_BASE + "/tv/" + tmdbId + "/season/" + season + "?api_key=" + TMDB_API_KEY
-                            var seasonRes = fetch(seasonUrl)
+                            var seasonRes = fetch(TMDB_API_BASE + "/tv/" + tmdbId + "/season/" + season + "?api_key=" + TMDB_API_KEY)
                             
                             if (seasonRes && seasonRes.ok) {
                                 var seasonData = seasonRes.json()
                                 var episodes = seasonData.episodes || []
-                                console.log("[TMDb Provider] Season " + season + ": " + episodes.length + " episodes")
                                 
                                 for (var i = 0; i < episodes.length; i++) {
                                     var ep = episodes[i]
@@ -78,20 +74,16 @@ function init() {
                                         var imageUrl = "https://image.tmdb.org/t/p/original" + ep.still_path
                                         e.animeMetadata.episodes[epNum].image = imageUrl
                                         e.animeMetadata.episodes[epNum].hasImage = true
-                                        console.log("[TMDb Provider] ✅ Replaced episode " + epNum)
+                                        console.log("[TMDb Provider] ✅ Episode " + epNum)
                                         totalReplaced++
                                     }
                                 }
                             }
                         }
                         
-                        console.log("[TMDb Provider] ✅ Done: Replaced " + totalReplaced + " total")
+                        console.log("[TMDb Provider] ✅ Replaced " + totalReplaced + " episodes")
                     }
-                } else {
-                    console.log("[TMDb Provider] No results found")
                 }
-            } else {
-                console.log("[TMDb Provider] Fetch failed or not ok")
             }
         } catch (err) {
             console.error("[TMDb Provider] Error: " + err)
