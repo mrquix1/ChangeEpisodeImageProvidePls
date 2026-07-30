@@ -1,7 +1,7 @@
 {
     "id": "tmdb-episode-provider",
     "name": "TMDb Episode Provider",
-    "version": "16.0.0",
+    "version": "17.0.0",
     "description": "Automatically replaces low-quality TheTVDB episode images with higher quality versions from TMDb",
     "author": "mrquix1",
     "type": "plugin",
