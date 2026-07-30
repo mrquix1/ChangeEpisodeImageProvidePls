@@ -5,7 +5,6 @@
 function init() {
     console.log("[TMDb Provider] ✅ Plugin init started")
 
-    // DEFINE CONFIG AS SHARED - THIS WORKS ACROSS ALL RUNTIMES
     $shared.define("tmdbConfig", function() {
         return {
             API_KEY: "7b7daf721c0b4b5789d993c24402a9dc",
@@ -13,9 +12,8 @@ function init() {
         }
     })
 
-    console.log("[TMDb Provider] ✅ Config defined in $shared")
+    console.log("[TMDb Provider] ✅ Config defined")
 
-    // Hook into anime metadata
     $app.onAnimeMetadata(function(e) {
         if (!e.animeMetadata || !e.animeMetadata.episodes) {
             e.next()
@@ -41,70 +39,77 @@ function init() {
         }
 
         try {
-            // GET CONFIG FROM $shared
             var config = $shared.use("tmdbConfig")
-            console.log("[TMDb Provider] Config retrieved from $shared")
 
-            // Synchronous fetch for TMDb API
             var searchUrl = config.API_BASE + "/search/tv?api_key=" + config.API_KEY + "&query=" + encodeURIComponent(titleToSearch)
-            console.log("[TMDb Provider] Fetching: " + searchUrl)
+            console.log("[TMDb Provider] Searching TMDb...")
 
             var searchRes = fetch(searchUrl)
-            console.log("[TMDb Provider] Fetch completed, status: " + (searchRes ? searchRes.status : "null"))
-
-            if (searchRes && searchRes.ok) {
-                var searchData = searchRes.json()
-                console.log("[TMDb Provider] Parsed JSON, results: " + (searchData.results ? searchData.results.length : 0))
-
-                if (searchData.results && searchData.results.length > 0) {
-                    var tmdbId = searchData.results[0].id
-                    var tmdbName = searchData.results[0].name
-                    console.log("[TMDb Provider] Found: " + tmdbName + " (ID: " + tmdbId + ")")
-
-                    // Get show info
-                    var showUrl = config.API_BASE + "/tv/" + tmdbId + "?api_key=" + config.API_KEY
-                    var showRes = fetch(showUrl)
-
-                    if (showRes && showRes.ok) {
-                        var show = showRes.json()
-                        var seasonCount = show.number_of_seasons || 0
-                        console.log("[TMDb Provider] Found " + seasonCount + " seasons")
-
-                        var totalReplaced = 0
-
-                        // Fetch all seasons
-                        for (var season = 1; season <= seasonCount; season++) {
-                            var seasonUrl = config.API_BASE + "/tv/" + tmdbId + "/season/" + season + "?api_key=" + config.API_KEY
-                            var seasonRes = fetch(seasonUrl)
-
-                            if (seasonRes && seasonRes.ok) {
-                                var seasonData = seasonRes.json()
-                                var episodes = seasonData.episodes || []
-                                console.log("[TMDb Provider] Season " + season + ": " + episodes.length + " episodes")
-
-                                for (var i = 0; i < episodes.length; i++) {
-                                    var ep = episodes[i]
-                                    var epNum = ep.episode_number
-
-                                    if (ep.still_path && e.animeMetadata.episodes[epNum]) {
-                                        var imageUrl = "https://image.tmdb.org/t/p/original" + ep.still_path
-                                        e.animeMetadata.episodes[epNum].image = imageUrl
-                                        e.animeMetadata.episodes[epNum].hasImage = true
-                                        console.log("[TMDb Provider] ✅ Replaced episode " + epNum)
-                                        totalReplaced++
-                                    }
-                                }
-                            }
-                        }
-
-                        console.log("[TMDb Provider] ✅ Done: Replaced " + totalReplaced + " episodes")
-                    }
-                } else {
-                    console.log("[TMDb Provider] No match found")
-                }
-            } else {
-                console.log("[TMDb Provider] Fetch failed or not ok")
+            
+            if (!searchRes) {
+                console.log("[TMDb Provider] Fetch returned null")
+                e.next()
+                return
             }
+
+            console.log("[TMDb Provider] Fetch returned, parsing...")
+
+            var searchData = searchRes.json()
+            
+            if (!searchData || !searchData.results || searchData.results.length === 0) {
+                console.log("[TMDb Provider] No results from TMDb")
+                e.next()
+                return
+            }
+
+            var tmdbId = searchData.results[0].id
+            var tmdbName = searchData.results[0].name
+            console.log("[TMDb Provider] ✅ Found: " + tmdbName + " (ID: " + tmdbId + ")")
+
+            // Get show details
+            var showUrl = config.API_BASE + "/tv/" + tmdbId + "?api_key=" + config.API_KEY
+            var showRes = fetch(showUrl)
+
+            if (!showRes) {
+                console.log("[TMDb Provider] Show fetch failed")
+                e.next()
+                return
+            }
+
+            var show = showRes.json()
+            var seasonCount = show.number_of_seasons || 0
+            console.log("[TMDb Provider] Found " + seasonCount + " seasons")
+
+            var totalReplaced = 0
+
+            // Fetch all seasons
+            for (var season = 1; season <= seasonCount; season++) {
+                var seasonUrl = config.API_BASE + "/tv/" + tmdbId + "/season/" + season + "?api_key=" + config.API_KEY
+                var seasonRes = fetch(seasonUrl)
+
+                if (!seasonRes) {
+                    continue
+                }
+
+                var seasonData = seasonRes.json()
+                var episodes = seasonData.episodes || []
+
+                for (var i = 0; i < episodes.length; i++) {
+                    var ep = episodes[i]
+                    var epNum = ep.episode_number
+
+                    if (ep.still_path && e.animeMetadata.episodes && e.animeMetadata.episodes[epNum]) {
+                        var imageUrl = "https://image.tmdb.org/t/p/original" + ep.still_path
+                        e.animeMetadata.episodes[epNum].image = imageUrl
+                        e.animeMetadata.episodes[epNum].hasImage = true
+                        console.log("[TMDb Provider] ✅ Episode " + epNum)
+                        totalReplaced++
+                    }
+                }
+            }
+
+            console.log("[TMDb Provider] ✅✅✅ Replaced " + totalReplaced + " images for " + tmdbName)
+
         } catch (err) {
             console.error("[TMDb Provider] Error: " + err)
         }
@@ -112,9 +117,8 @@ function init() {
         e.next()
     })
 
-    // UI Context
     $ui.register(function(ctx) {
-        console.log("[TMDb Provider] ✅ UI context registered")
+        console.log("[TMDb Provider] ✅ UI loaded")
 
         var tray = ctx.newTray({
             tooltipText: "TMDb Episode Provider",
@@ -129,7 +133,5 @@ function init() {
                 tray.text("Status: " + status.get(), { className: "text-sm" })
             ])
         })
-
-        console.log("[TMDb Provider] ✅ Loaded!")
     })
 }
