@@ -5,16 +5,15 @@
 function init() {
     console.log("[TMDb Provider] ✅ Plugin init started")
 
-    const TMDB_API_KEY = "7b7daf721c0b4b5789d993c24402a9dc"
-    const TMDB_API_BASE = "https://api.themoviedb.org/3"
-
-    // Define shared config that can be used across runtimes
+    // DEFINE CONFIG AS SHARED - THIS WORKS ACROSS ALL RUNTIMES
     $shared.define("tmdbConfig", function() {
         return {
-            apiKey: TMDB_API_KEY,
-            apiBase: TMDB_API_BASE
+            API_KEY: "7b7daf721c0b4b5789d993c24402a9dc",
+            API_BASE: "https://api.themoviedb.org/3"
         }
     })
+
+    console.log("[TMDb Provider] ✅ Config defined in $shared")
 
     // Hook into anime metadata
     $app.onAnimeMetadata(function(e) {
@@ -29,7 +28,7 @@ function init() {
         if (e.animeMetadata.getTitle && typeof e.animeMetadata.getTitle === "function") {
             titleToSearch = e.animeMetadata.getTitle()
         } else if (e.animeMetadata.titles) {
-            titleToSearch = e.animeMetadata.titles.english || e.animeMetadata.titles.romaji || e.animeMetadata.titles.native
+            titleToSearch = e.animeMetadata.titles.english || e.animeMetadata.titles.romaji
         }
 
         titleToSearch = titleToSearch.replace(/\s+Season\s+\d+/i, "").trim()
@@ -42,16 +41,20 @@ function init() {
         }
 
         try {
+            // GET CONFIG FROM $shared
+            var config = $shared.use("tmdbConfig")
+            console.log("[TMDb Provider] Config retrieved from $shared")
+
             // Synchronous fetch for TMDb API
-            var searchUrl = TMDB_API_BASE + "/search/tv?api_key=" + TMDB_API_KEY + "&query=" + encodeURIComponent(titleToSearch)
+            var searchUrl = config.API_BASE + "/search/tv?api_key=" + config.API_KEY + "&query=" + encodeURIComponent(titleToSearch)
             console.log("[TMDb Provider] Fetching: " + searchUrl)
 
             var searchRes = fetch(searchUrl)
-            console.log("[TMDb Provider] Fetch returned, status: " + (searchRes ? searchRes.status : "null"))
+            console.log("[TMDb Provider] Fetch completed, status: " + (searchRes ? searchRes.status : "null"))
 
             if (searchRes && searchRes.ok) {
                 var searchData = searchRes.json()
-                console.log("[TMDb Provider] Got response, results: " + (searchData.results ? searchData.results.length : 0))
+                console.log("[TMDb Provider] Parsed JSON, results: " + (searchData.results ? searchData.results.length : 0))
 
                 if (searchData.results && searchData.results.length > 0) {
                     var tmdbId = searchData.results[0].id
@@ -59,7 +62,7 @@ function init() {
                     console.log("[TMDb Provider] Found: " + tmdbName + " (ID: " + tmdbId + ")")
 
                     // Get show info
-                    var showUrl = TMDB_API_BASE + "/tv/" + tmdbId + "?api_key=" + TMDB_API_KEY
+                    var showUrl = config.API_BASE + "/tv/" + tmdbId + "?api_key=" + config.API_KEY
                     var showRes = fetch(showUrl)
 
                     if (showRes && showRes.ok) {
@@ -71,7 +74,7 @@ function init() {
 
                         // Fetch all seasons
                         for (var season = 1; season <= seasonCount; season++) {
-                            var seasonUrl = TMDB_API_BASE + "/tv/" + tmdbId + "/season/" + season + "?api_key=" + TMDB_API_KEY
+                            var seasonUrl = config.API_BASE + "/tv/" + tmdbId + "/season/" + season + "?api_key=" + config.API_KEY
                             var seasonRes = fetch(seasonUrl)
 
                             if (seasonRes && seasonRes.ok) {
