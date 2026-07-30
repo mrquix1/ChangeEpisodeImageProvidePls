@@ -42,20 +42,11 @@ function init() {
             var searchUrl = config.API_BASE + "/search/tv?api_key=" + config.API_KEY + "&query=" + encodeURIComponent(titleToSearch)
             console.log("[TMDb Provider] Fetching: " + searchUrl)
 
-            // FETCH AS TEXT, NOT JSON
-            var searchRes = fetch(searchUrl)
+            // Fetch returns OBJECT directly, not text!
+            var searchData = fetch(searchUrl)
             console.log("[TMDb Provider] Got response")
 
-            // Parse the text response as JSON manually
-            var searchDataText = searchRes
-            console.log("[TMDb Provider] Response type: " + typeof searchDataText)
-            console.log("[TMDb Provider] Response length: " + searchDataText.length)
-
-            // Try to parse it
-            var searchData = JSON.parse(searchDataText)
-            console.log("[TMDb Provider] Parsed JSON, results: " + (searchData.results ? searchData.results.length : 0))
-
-            if (!searchData.results || searchData.results.length === 0) {
+            if (!searchData || !searchData.results || searchData.results.length === 0) {
                 console.log("[TMDb Provider] No results")
                 e.next()
                 return
@@ -63,22 +54,20 @@ function init() {
 
             var tmdbId = searchData.results[0].id
             var tmdbName = searchData.results[0].name
-            console.log("[TMDb Provider] Found: " + tmdbName + " (ID: " + tmdbId + ")")
+            console.log("[TMDb Provider] ✅ Found: " + tmdbName + " (ID: " + tmdbId + ")")
 
             // Get show details
             var showUrl = config.API_BASE + "/tv/" + tmdbId + "?api_key=" + config.API_KEY
-            var showRes = fetch(showUrl)
-            var show = JSON.parse(showRes)
+            var show = fetch(showUrl)
             var seasonCount = show.number_of_seasons || 0
-            console.log("[TMDb Provider] Seasons: " + seasonCount)
+            console.log("[TMDb Provider] ✅ Seasons: " + seasonCount)
 
             var totalReplaced = 0
 
             // Fetch all seasons
             for (var season = 1; season <= seasonCount; season++) {
                 var seasonUrl = config.API_BASE + "/tv/" + tmdbId + "/season/" + season + "?api_key=" + config.API_KEY
-                var seasonRes = fetch(seasonUrl)
-                var seasonData = JSON.parse(seasonRes)
+                var seasonData = fetch(seasonUrl)
                 var episodes = seasonData.episodes || []
 
                 for (var i = 0; i < episodes.length; i++) {
@@ -95,7 +84,7 @@ function init() {
                 }
             }
 
-            console.log("[TMDb Provider] ✅✅✅ Replaced " + totalReplaced + " images")
+            console.log("[TMDb Provider] ✅✅✅ DONE - Replaced " + totalReplaced + " episodes!")
 
         } catch (err) {
             console.error("[TMDb Provider] Error: " + err)
@@ -112,12 +101,10 @@ function init() {
             withContent: true
         })
 
-        var status = ctx.state("Ready")
-
         tray.render(function() {
             return tray.stack([
                 tray.text("TMDb Episode Provider", { className: "font-bold" }),
-                tray.text("Status: " + status.get(), { className: "text-sm" })
+                tray.text("Status: Ready", { className: "text-sm" })
             ])
         })
     })
