@@ -12,8 +12,6 @@ function init() {
         }
     })
 
-    console.log("[TMDb Provider] ✅ Config defined")
-
     $app.onAnimeMetadata(function(e) {
         if (!e.animeMetadata || !e.animeMetadata.episodes) {
             e.next()
@@ -42,43 +40,37 @@ function init() {
             var config = $shared.use("tmdbConfig")
 
             var searchUrl = config.API_BASE + "/search/tv?api_key=" + config.API_KEY + "&query=" + encodeURIComponent(titleToSearch)
-            console.log("[TMDb Provider] Searching TMDb...")
+            console.log("[TMDb Provider] Fetching: " + searchUrl)
 
+            // FETCH AS TEXT, NOT JSON
             var searchRes = fetch(searchUrl)
-            
-            if (!searchRes) {
-                console.log("[TMDb Provider] Fetch returned null")
-                e.next()
-                return
-            }
+            console.log("[TMDb Provider] Got response")
 
-            console.log("[TMDb Provider] Fetch returned, parsing...")
+            // Parse the text response as JSON manually
+            var searchDataText = searchRes
+            console.log("[TMDb Provider] Response type: " + typeof searchDataText)
+            console.log("[TMDb Provider] Response length: " + searchDataText.length)
 
-            var searchData = searchRes.json()
-            
-            if (!searchData || !searchData.results || searchData.results.length === 0) {
-                console.log("[TMDb Provider] No results from TMDb")
+            // Try to parse it
+            var searchData = JSON.parse(searchDataText)
+            console.log("[TMDb Provider] Parsed JSON, results: " + (searchData.results ? searchData.results.length : 0))
+
+            if (!searchData.results || searchData.results.length === 0) {
+                console.log("[TMDb Provider] No results")
                 e.next()
                 return
             }
 
             var tmdbId = searchData.results[0].id
             var tmdbName = searchData.results[0].name
-            console.log("[TMDb Provider] ✅ Found: " + tmdbName + " (ID: " + tmdbId + ")")
+            console.log("[TMDb Provider] Found: " + tmdbName + " (ID: " + tmdbId + ")")
 
             // Get show details
             var showUrl = config.API_BASE + "/tv/" + tmdbId + "?api_key=" + config.API_KEY
             var showRes = fetch(showUrl)
-
-            if (!showRes) {
-                console.log("[TMDb Provider] Show fetch failed")
-                e.next()
-                return
-            }
-
-            var show = showRes.json()
+            var show = JSON.parse(showRes)
             var seasonCount = show.number_of_seasons || 0
-            console.log("[TMDb Provider] Found " + seasonCount + " seasons")
+            console.log("[TMDb Provider] Seasons: " + seasonCount)
 
             var totalReplaced = 0
 
@@ -86,12 +78,7 @@ function init() {
             for (var season = 1; season <= seasonCount; season++) {
                 var seasonUrl = config.API_BASE + "/tv/" + tmdbId + "/season/" + season + "?api_key=" + config.API_KEY
                 var seasonRes = fetch(seasonUrl)
-
-                if (!seasonRes) {
-                    continue
-                }
-
-                var seasonData = seasonRes.json()
+                var seasonData = JSON.parse(seasonRes)
                 var episodes = seasonData.episodes || []
 
                 for (var i = 0; i < episodes.length; i++) {
@@ -108,7 +95,7 @@ function init() {
                 }
             }
 
-            console.log("[TMDb Provider] ✅✅✅ Replaced " + totalReplaced + " images for " + tmdbName)
+            console.log("[TMDb Provider] ✅✅✅ Replaced " + totalReplaced + " images")
 
         } catch (err) {
             console.error("[TMDb Provider] Error: " + err)
