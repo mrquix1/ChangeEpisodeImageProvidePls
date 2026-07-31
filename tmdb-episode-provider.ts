@@ -77,7 +77,7 @@ function init() {
             addLog("Searching TMDb for: " + titleToSearch)
 
             try {
-                var API_KEY = "7b7daf721c0b4b5789d993c24402a9dc"
+                var API_KEY = "eaf9b42d6945bfe9a7d81e97174b04af"
                 var API_BASE = "https://api.themoviedb.org/3"
                 
                 var searchUrl = API_BASE + "/search/tv?api_key=" + API_KEY + "&query=" + encodeURIComponent(titleToSearch)
