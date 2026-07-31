@@ -84,6 +84,7 @@ function init() {
                 addLog("URL: " + searchUrl)
 
                 var searchData = fetch(searchUrl)
+                addLog("Full response: " + JSON.stringify(searchData))
                 addLog("Fetched, response type: " + typeof searchData)
                 addLog("Response keys: " + Object.keys(searchData).join(", "))
 
