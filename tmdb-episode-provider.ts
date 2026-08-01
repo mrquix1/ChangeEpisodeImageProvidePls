@@ -96,17 +96,30 @@ function init() {
             withContent: true
         })
 
+        var autoStartEnabled = ctx.state(true)
+
         tray.render(function() {
             return tray.stack([
                 tray.text("TMDb Episode Provider", { className: "font-bold" }),
-                tray.text("Status: Ready", { className: "text-sm" })
+                tray.text("Status: Ready", { className: "text-sm" }),
+                tray.div({ style: { marginTop: "15px", paddingTop: "15px", borderTop: "1px solid rgba(255,255,255,0.1)" } }),
+                tray.text("STARTUP", { className: "text-xs font-bold", style: { color: "rgba(255,255,255,0.4)", textTransform: "uppercase" } }),
+                tray.checkbox({
+                    label: "Auto-refresh images on launch",
+                    checked: autoStartEnabled.get(),
+                    onChange: function(checked) {
+                        autoStartEnabled.set(checked)
+                    }
+                })
             ])
         })
 
-        // Background polling job - runs every 5 seconds even when UI is closed
+        // Background job that runs on startup
         if (ctx.jobs && ctx.jobs.poll) {
-            ctx.jobs.poll("tmdb-refresh", function() {
-                console.log("[TMDb Provider] Background refresh check running...")
+            ctx.jobs.poll("tmdb-provider-startup", function() {
+                if (autoStartEnabled.get()) {
+                    console.log("[TMDb Provider] Auto-refresh enabled - waiting for metadata...")
+                }
             }, 5000, { immediate: true })
         }
     })
