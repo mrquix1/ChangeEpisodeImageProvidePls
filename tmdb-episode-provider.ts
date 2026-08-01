@@ -5,19 +5,57 @@
 function init() {
     console.log("[TMDb Provider] ✅ Plugin init started")
 
+    var API_KEY = "eaf9b42d6945bfe9a7d81e97174b04af"
+    var API_BASE = "https://api.themoviedb.org/3"
+
+    // Run on app startup
+    async function processAllAnime() {
+        console.log("[TMDb Provider] ⏳ Starting batch processing on app startup...")
+        
+        try {
+            // Get all anime from AniList collection
+            var anilistRes = await fetch("https://graphql.anilist.co", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    query: `{
+                        Page(page: 1, perPage: 50) {
+                            media(type: ANIME) {
+                                id
+                                title { english romaji }
+                                episodes
+                            }
+                        }
+                    }`
+                })
+            })
+            
+            var anilistData = await anilistRes.json()
+            console.log("[TMDb Provider] Found " + (anilistData.data?.Page?.media?.length || 0) + " anime")
+            
+        } catch (err) {
+            console.log("[TMDb Provider] Startup processing skipped: " + err)
+        }
+    }
+
+    // Trigger on startup
+    if (typeof $app.onAppStart === "function") {
+        $app.onAppStart(function() {
+            console.log("[TMDb Provider] App started, processing anime...")
+            processAllAnime()
+        })
+    }
+
+    // Also keep the normal hook for when user navigates
     $app.onAnimeMetadata(async function(e) {
         if (!e.animeMetadata || !e.animeMetadata.episodes) {
             e.next()
             return
         }
 
-        console.log("[TMDb Provider] Hook fired for media " + e.mediaId)
+        console.log("[TMDb Provider] Processing media " + e.mediaId)
 
         try {
-            var API_KEY = "eaf9b42d6945bfe9a7d81e97174b04af"
-            var API_BASE = "https://api.themoviedb.org/3"
-
-            // Get title
             var titleToSearch = ""
             if (e.animeMetadata.getTitle && typeof e.animeMetadata.getTitle === "function") {
                 titleToSearch = e.animeMetadata.getTitle()
@@ -26,42 +64,34 @@ function init() {
             }
 
             titleToSearch = titleToSearch.replace(/\s+Season\s+\d+/i, "").trim()
-            console.log("[TMDb Provider] Searching TMDb: " + titleToSearch)
+            console.log("[TMDb Provider] Searching: " + titleToSearch)
 
-            // Search TMDb
             var searchRes = await fetch(API_BASE + "/search/tv?api_key=" + API_KEY + "&query=" + encodeURIComponent(titleToSearch))
             var searchData = await searchRes.json()
 
             if (!searchData.results || searchData.results.length === 0) {
-                console.log("[TMDb Provider] No TMDb match")
                 e.next()
                 return
             }
 
             var tmdbId = searchData.results[0].id
-            var tmdbName = searchData.results[0].name
-            console.log("[TMDb Provider] Found TMDb: " + tmdbName)
+            console.log("[TMDb Provider] Found: " + searchData.results[0].name)
 
-            // Get show info
             var showRes = await fetch(API_BASE + "/tv/" + tmdbId + "?api_key=" + API_KEY)
             var show = await showRes.json()
             var seasonCount = show.number_of_seasons || 0
-            console.log("[TMDb Provider] TMDb Seasons: " + seasonCount)
 
             var totalReplaced = 0
             var episodeIndex = 1
             
-            // Fetch all TMDb seasons
             for (var season = 1; season <= seasonCount; season++) {
                 var seasonRes = await fetch(API_BASE + "/tv/" + tmdbId + "/season/" + season + "?api_key=" + API_KEY)
                 var seasonData = await seasonRes.json()
                 var episodes = seasonData.episodes || []
-                console.log("[TMDb Provider] Season " + season + ": " + episodes.length + " episodes")
 
                 for (var i = 0; i < episodes.length; i++) {
                     var tmdbEp = episodes[i]
 
-                    // Find matching local episode
                     var matchedKey = null
                     var episodeKeys = Object.keys(e.animeMetadata.episodes)
                     
@@ -78,13 +108,11 @@ function init() {
                         }
                     }
 
-                    // Use highest quality: try 1920x1080 first, fallback to 1280
                     if (matchedKey && tmdbEp.still_path) {
                         var imageUrl = "https://image.tmdb.org/t/p/original" + tmdbEp.still_path
-                        
                         e.animeMetadata.episodes[matchedKey].image = imageUrl
                         e.animeMetadata.episodes[matchedKey].hasImage = true
-                        console.log("[TMDb Provider] ✅ ep " + matchedKey + " <- S" + season + "E" + tmdbEp.episode_number)
+                        console.log("[TMDb Provider] ✅ Episode " + matchedKey)
                         totalReplaced++
                     }
 
@@ -92,7 +120,7 @@ function init() {
                 }
             }
 
-            console.log("[TMDb Provider] ✅✅✅ Replaced " + totalReplaced + " episodes!")
+            console.log("[TMDb Provider] ✅ Replaced " + totalReplaced + " episodes!")
 
         } catch (err) {
             console.error("[TMDb Provider] Error: " + err)
