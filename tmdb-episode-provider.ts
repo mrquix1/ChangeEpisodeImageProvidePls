@@ -5,48 +5,6 @@
 function init() {
     console.log("[TMDb Provider] ✅ Plugin init started")
 
-    var API_KEY = "eaf9b42d6945bfe9a7d81e97174b04af"
-    var API_BASE = "https://api.themoviedb.org/3"
-
-    // Run on app startup
-    async function processAllAnime() {
-        console.log("[TMDb Provider] ⏳ Starting batch processing on app startup...")
-        
-        try {
-            // Get all anime from AniList collection
-            var anilistRes = await fetch("https://graphql.anilist.co", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    query: `{
-                        Page(page: 1, perPage: 50) {
-                            media(type: ANIME) {
-                                id
-                                title { english romaji }
-                                episodes
-                            }
-                        }
-                    }`
-                })
-            })
-            
-            var anilistData = await anilistRes.json()
-            console.log("[TMDb Provider] Found " + (anilistData.data?.Page?.media?.length || 0) + " anime")
-            
-        } catch (err) {
-            console.log("[TMDb Provider] Startup processing skipped: " + err)
-        }
-    }
-
-    // Trigger on startup
-    if (typeof $app.onAppStart === "function") {
-        $app.onAppStart(function() {
-            console.log("[TMDb Provider] App started, processing anime...")
-            processAllAnime()
-        })
-    }
-
-    // Also keep the normal hook for when user navigates
     $app.onAnimeMetadata(async function(e) {
         if (!e.animeMetadata || !e.animeMetadata.episodes) {
             e.next()
@@ -56,6 +14,9 @@ function init() {
         console.log("[TMDb Provider] Processing media " + e.mediaId)
 
         try {
+            var API_KEY = "eaf9b42d6945bfe9a7d81e97174b04af"
+            var API_BASE = "https://api.themoviedb.org/3"
+
             var titleToSearch = ""
             if (e.animeMetadata.getTitle && typeof e.animeMetadata.getTitle === "function") {
                 titleToSearch = e.animeMetadata.getTitle()
@@ -141,5 +102,12 @@ function init() {
                 tray.text("Status: Ready", { className: "text-sm" })
             ])
         })
+
+        // Background polling job - runs every 5 seconds even when UI is closed
+        if (ctx.jobs && ctx.jobs.poll) {
+            ctx.jobs.poll("tmdb-refresh", function() {
+                console.log("[TMDb Provider] Background refresh check running...")
+            }, 5000, { immediate: true })
+        }
     })
 }
