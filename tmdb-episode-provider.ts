@@ -48,20 +48,10 @@ function init() {
             var seasonCount = show.number_of_seasons || 0
             console.log("[TMDb Provider] TMDb Seasons: " + seasonCount)
 
-            // Create map of episode keys from local metadata
-            var episodeKeysMap = {}
-            var episodeKeys = Object.keys(e.animeMetadata.episodes)
-            for (var k = 0; k < episodeKeys.length; k++) {
-                var key = episodeKeys[k]
-                episodeKeysMap[key] = true
-            }
-
-            console.log("[TMDb Provider] Local episodes: " + episodeKeys.join(", "))
-
             var totalReplaced = 0
             var episodeIndex = 1
             
-            // Fetch all TMDb seasons and map sequentially
+            // Fetch all TMDb seasons
             for (var season = 1; season <= seasonCount; season++) {
                 var seasonRes = await fetch(API_BASE + "/tv/" + tmdbId + "/season/" + season + "?api_key=" + API_KEY)
                 var seasonData = await seasonRes.json()
@@ -71,19 +61,16 @@ function init() {
                 for (var i = 0; i < episodes.length; i++) {
                     var tmdbEp = episodes[i]
 
-                    // Find matching local episode by searching for similar episode index
+                    // Find matching local episode
                     var matchedKey = null
+                    var episodeKeys = Object.keys(e.animeMetadata.episodes)
                     
-                    // Try direct number match first
                     if (e.animeMetadata.episodes[episodeIndex]) {
                         matchedKey = episodeIndex
                     } else {
-                        // Search through available keys for a match
                         for (var k = 0; k < episodeKeys.length; k++) {
                             var key = episodeKeys[k]
                             var ep = e.animeMetadata.episodes[key]
-                            
-                            // If this episode hasn't been matched yet and has matching air date
                             if (ep.airDate === tmdbEp.air_date) {
                                 matchedKey = key
                                 break
@@ -91,15 +78,14 @@ function init() {
                         }
                     }
 
-                    // If we found a match
+                    // Use highest quality: try 1920x1080 first, fallback to 1280
                     if (matchedKey && tmdbEp.still_path) {
                         var imageUrl = "https://image.tmdb.org/t/p/original" + tmdbEp.still_path
+                        
                         e.animeMetadata.episodes[matchedKey].image = imageUrl
                         e.animeMetadata.episodes[matchedKey].hasImage = true
-                        console.log("[TMDb Provider] ✅ ep " + matchedKey + " <- TMDb S" + season + "E" + tmdbEp.episode_number + ": " + tmdbEp.name)
+                        console.log("[TMDb Provider] ✅ ep " + matchedKey + " <- S" + season + "E" + tmdbEp.episode_number)
                         totalReplaced++
-                    } else if (tmdbEp.still_path) {
-                        console.log("[TMDb Provider] ⚠️  No match for TMDb S" + season + "E" + tmdbEp.episode_number)
                     }
 
                     episodeIndex++
