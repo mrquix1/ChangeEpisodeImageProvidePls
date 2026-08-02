@@ -90,16 +90,9 @@ function init() {
         }
     }
 
-    // Hook 1: Fires on Seanime startup when loading library data (AUTO-REFRESH)
-    $app.onAnimeEntryLibraryDataRequested(function(e) {
-        console.log("[TMDb Provider] Auto-refresh: Library data requested for media " + e.mediaId)
-        processEpisodeImages(e)
-        e.next()
-    })
-
-    // Hook 2: Fires when user navigates to anime page (MANUAL REFRESH)
+    // Hook: Fires when user navigates to anime page
     $app.onAnimeMetadata(async function(e) {
-        console.log("[TMDb Provider] Manual refresh: Metadata loaded for media " + e.mediaId)
+        console.log("[TMDb Provider] Metadata loaded for media " + e.mediaId)
         await processEpisodeImages(e)
         e.next()
     })
@@ -113,8 +106,8 @@ function init() {
         tray.render(function() {
             return tray.stack([
                 tray.text("TMDb Episode Provider", { className: "font-bold" }),
-                tray.text("Status: ✅ Auto-refresh on startup + Manual refresh", { className: "text-sm" }),
-                tray.text("Fixed: Duplicate banner issue + Auto-refresh on boot", { className: "text-xs", style: { color: "rgba(255,255,255,0.6)", marginTop: "10px" } })
+                tray.text("Status: ✅ Processing images", { className: "text-sm" }),
+                tray.text("Refreshes when you navigate to anime", { className: "text-xs", style: { color: "rgba(255,255,255,0.6)", marginTop: "10px" } })
             ])
         })
     })
