@@ -5,9 +5,9 @@
 function init() {
     console.log("[TMDb Provider] ✅ Plugin init started")
 
-    $app.onAnimeMetadata(async function(e) {
+    // Function to process and replace episode images
+    async function processEpisodeImages(e) {
         if (!e.animeMetadata || !e.animeMetadata.episodes) {
-            e.next()
             return
         }
 
@@ -31,7 +31,7 @@ function init() {
             var searchData = await searchRes.json()
 
             if (!searchData.results || searchData.results.length === 0) {
-                e.next()
+                console.log("[TMDb Provider] No match")
                 return
             }
 
@@ -56,24 +56,26 @@ function init() {
                     var matchedKey = null
                     var episodeKeys = Object.keys(e.animeMetadata.episodes)
                     
-                    if (e.animeMetadata.episodes[episodeIndex]) {
-                        matchedKey = episodeIndex
-                    } else {
-                        for (var k = 0; k < episodeKeys.length; k++) {
-                            var key = episodeKeys[k]
-                            var ep = e.animeMetadata.episodes[key]
-                            if (ep.airDate === tmdbEp.air_date) {
-                                matchedKey = key
-                                break
-                            }
+                    // PRIORITY 1: Match by air date (most reliable - fixes duplicate banner problem)
+                    for (var k = 0; k < episodeKeys.length; k++) {
+                        var key = episodeKeys[k]
+                        var ep = e.animeMetadata.episodes[key]
+                        if (ep.airDate && tmdbEp.air_date && ep.airDate === tmdbEp.air_date) {
+                            matchedKey = key
+                            break
                         }
                     }
 
-                    if (matchedKey && tmdbEp.still_path) {
+                    // PRIORITY 2: Fall back to continuous episode index
+                    if (!matchedKey && e.animeMetadata.episodes[episodeIndex]) {
+                        matchedKey = episodeIndex
+                    }
+
+                    if (matchedKey && tmdbEp.still_path && e.animeMetadata.episodes[matchedKey]) {
                         var imageUrl = "https://image.tmdb.org/t/p/original" + tmdbEp.still_path
                         e.animeMetadata.episodes[matchedKey].image = imageUrl
                         e.animeMetadata.episodes[matchedKey].hasImage = true
-                        console.log("[TMDb Provider] ✅ Episode " + matchedKey)
+                        console.log("[TMDb Provider] ✅ Episode " + matchedKey + " (S" + season + "E" + tmdbEp.episode_number + ")")
                         totalReplaced++
                     }
 
@@ -86,7 +88,19 @@ function init() {
         } catch (err) {
             console.error("[TMDb Provider] Error: " + err)
         }
+    }
 
+    // Hook 1: Fires on Seanime startup when loading library data (AUTO-REFRESH)
+    $app.onAnimeEntryLibraryDataRequested(function(e) {
+        console.log("[TMDb Provider] Auto-refresh: Library data requested for media " + e.mediaId)
+        processEpisodeImages(e)
+        e.next()
+    })
+
+    // Hook 2: Fires when user navigates to anime page (MANUAL REFRESH)
+    $app.onAnimeMetadata(async function(e) {
+        console.log("[TMDb Provider] Manual refresh: Metadata loaded for media " + e.mediaId)
+        await processEpisodeImages(e)
         e.next()
     })
 
@@ -96,31 +110,12 @@ function init() {
             withContent: true
         })
 
-        var autoStartEnabled = ctx.state(true)
-
         tray.render(function() {
             return tray.stack([
                 tray.text("TMDb Episode Provider", { className: "font-bold" }),
-                tray.text("Status: Ready", { className: "text-sm" }),
-                tray.div({ style: { marginTop: "15px", paddingTop: "15px", borderTop: "1px solid rgba(255,255,255,0.1)" } }),
-                tray.text("STARTUP", { className: "text-xs font-bold", style: { color: "rgba(255,255,255,0.4)", textTransform: "uppercase" } }),
-                tray.checkbox({
-                    label: "Auto-refresh images on launch",
-                    checked: autoStartEnabled.get(),
-                    onChange: function(checked) {
-                        autoStartEnabled.set(checked)
-                    }
-                })
+                tray.text("Status: ✅ Auto-refresh on startup + Manual refresh", { className: "text-sm" }),
+                tray.text("Fixed: Duplicate banner issue + Auto-refresh on boot", { className: "text-xs", style: { color: "rgba(255,255,255,0.6)", marginTop: "10px" } })
             ])
         })
-
-        // Background job that runs on startup
-        if (ctx.jobs && ctx.jobs.poll) {
-            ctx.jobs.poll("tmdb-provider-startup", function() {
-                if (autoStartEnabled.get()) {
-                    console.log("[TMDb Provider] Auto-refresh enabled - waiting for metadata...")
-                }
-            }, 5000, { immediate: true })
-        }
     })
 }
